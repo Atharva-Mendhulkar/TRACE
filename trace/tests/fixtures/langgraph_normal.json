@@ -1,0 +1,25 @@
+[
+  {
+    "trace_id": "b0000000-0000-0000-0000-000000000001",
+    "agent_id": "langgraph-agent",
+    "node": "planner",
+    "type": "on_chain_start",
+    "step": 0
+  },
+  {
+    "trace_id": "b0000000-0000-0000-0000-000000000001",
+    "agent_id": "langgraph-agent",
+    "node": "tools",
+    "type": "tool_call",
+    "name": "web_search",
+    "args": {"query": "safety policy"},
+    "step": 1
+  },
+  {
+    "trace_id": "b0000000-0000-0000-0000-000000000001",
+    "agent_id": "langgraph-agent",
+    "node": "__end__",
+    "type": "terminate",
+    "step": 2
+  }
+]

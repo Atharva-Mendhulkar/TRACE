@@ -1,0 +1,4 @@
+# Golden Safety Policy for Deterministic Testing
+POLICY golden_safety_contract
+  REQUIRE confirm_step BEFORE tool_call(delete_*)
+  SCOPE TRACE

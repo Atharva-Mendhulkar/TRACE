@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trace-runtime"
+version = "0.1.0"
+description = "Trace-based Runtime Automata for Compliance and Enforcement"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "TRACE Research Team" }
+]
+dependencies = [
+    "pydantic>=2.0",
+    "jsonschema>=4.18",
+    "numpy>=1.24",
+    "scipy>=1.10"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+trace = "trace.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["trace*"]
+
+[tool.pytest.ini_options]
+testpaths = ["trace/tests"]
+python_files = "test_*.py"
+pythonpath = ["."]

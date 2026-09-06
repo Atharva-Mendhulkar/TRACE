@@ -1,0 +1,37 @@
+[
+  {
+    "event_id": "c0000000-0000-0000-0000-000000000001",
+    "classification": [],
+    "allowed": true,
+    "running_mean_nll": 0.0,
+    "is_violation": false
+  },
+  {
+    "event_id": "c0000000-0000-0000-0000-000000000002",
+    "classification": [],
+    "allowed": true,
+    "running_mean_nll": 0.0,
+    "is_violation": false
+  },
+  {
+    "event_id": "c0000000-0000-0000-0000-000000000003",
+    "classification": [],
+    "allowed": true,
+    "running_mean_nll": 0.0,
+    "is_violation": false
+  },
+  {
+    "event_id": "c0000000-0000-0000-0000-000000000004",
+    "classification": [],
+    "allowed": true,
+    "running_mean_nll": 0.0,
+    "is_violation": false
+  },
+  {
+    "event_id": "c0000000-0000-0000-0000-000000000005",
+    "classification": [],
+    "allowed": true,
+    "running_mean_nll": 0.0,
+    "is_violation": false
+  }
+]

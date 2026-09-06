@@ -1,0 +1,71 @@
+{
+  "q0": "q0",
+  "states": [
+    "q0",
+    "q1",
+    "q2",
+    "q3",
+    "q4",
+    "q5"
+  ],
+  "alphabet": [
+    "memory_write",
+    "plan_step",
+    "terminate",
+    "tool_result",
+    "web_search"
+  ],
+  "final_states": [
+    "q5"
+  ],
+  "transitions": [
+    {
+      "from_state": "q0",
+      "symbol": "plan_step",
+      "to_state": "q1",
+      "frequency": 1,
+      "probability": 1.0,
+      "low_confidence": true
+    },
+    {
+      "from_state": "q1",
+      "symbol": "web_search",
+      "to_state": "q2",
+      "frequency": 1,
+      "probability": 1.0,
+      "low_confidence": true
+    },
+    {
+      "from_state": "q2",
+      "symbol": "tool_result",
+      "to_state": "q3",
+      "frequency": 1,
+      "probability": 1.0,
+      "low_confidence": true
+    },
+    {
+      "from_state": "q3",
+      "symbol": "memory_write",
+      "to_state": "q4",
+      "frequency": 1,
+      "probability": 1.0,
+      "low_confidence": true
+    },
+    {
+      "from_state": "q4",
+      "symbol": "terminate",
+      "to_state": "q5",
+      "frequency": 1,
+      "probability": 1.0,
+      "low_confidence": true
+    }
+  ],
+  "final_counts": {
+    "q0": 0,
+    "q1": 0,
+    "q2": 0,
+    "q3": 0,
+    "q4": 0,
+    "q5": 1
+  }
+}

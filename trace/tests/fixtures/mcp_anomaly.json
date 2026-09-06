@@ -1,0 +1,25 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "trace_id": "a0000000-0000-0000-0000-000000000002",
+    "agent_id": "mcp-researcher",
+    "method": "tools/call",
+    "params": {
+      "name": "delete_database",
+      "arguments": {
+        "target": "prod_users"
+      }
+    },
+    "sequence_no": 0
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "trace_id": "a0000000-0000-0000-0000-000000000002",
+    "agent_id": "mcp-researcher",
+    "event_type": "terminate",
+    "symbol": "terminate",
+    "sequence_no": 1
+  }
+]

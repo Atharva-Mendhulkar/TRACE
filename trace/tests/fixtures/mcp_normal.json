@@ -1,0 +1,36 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "trace_id": "a0000000-0000-0000-0000-000000000001",
+    "agent_id": "mcp-researcher",
+    "method": "tools/call",
+    "params": {
+      "name": "web_search",
+      "arguments": {
+        "query": "automata learning AI agents"
+      }
+    },
+    "sequence_no": 0
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "trace_id": "a0000000-0000-0000-0000-000000000001",
+    "agent_id": "mcp-researcher",
+    "tool_name": "web_search",
+    "result": {
+      "content": [{"type": "text", "text": "Results found..."}]
+    },
+    "sequence_no": 1
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "trace_id": "a0000000-0000-0000-0000-000000000001",
+    "agent_id": "mcp-researcher",
+    "event_type": "terminate",
+    "symbol": "terminate",
+    "sequence_no": 2
+  }
+]

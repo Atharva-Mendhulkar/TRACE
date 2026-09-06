@@ -1,0 +1,5 @@
+# Example TRACE Safety Policy
+POLICY require_confirm_before_delete
+  REQUIRE confirm_step BEFORE tool_call(delete_*)
+  WITHIN 5 EVENTS
+  SCOPE TRACE

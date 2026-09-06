@@ -1,0 +1,107 @@
+[
+  {
+    "schema_version": "1.0",
+    "event_id": "c0000000-0000-0000-0000-000000000001",
+    "trace_id": "t0000000-0000-0000-0000-000000000001",
+    "span_id": "s0000000-0000-0000-0000-000000000001",
+    "agent_id": "golden-agent",
+    "depth": 0,
+    "event_type": "plan_step",
+    "symbol": "plan_step",
+    "raw_symbol": "planner_start",
+    "attributes": {
+      "param_schema_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "success"
+    },
+    "timestamp": "2026-09-07T00:00:00Z",
+    "framework": "custom",
+    "framework_schema_version": "1.0",
+    "adapter_version": "1.0.0",
+    "sequence_no": 0,
+    "status": "success"
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "c0000000-0000-0000-0000-000000000002",
+    "trace_id": "t0000000-0000-0000-0000-000000000001",
+    "span_id": "s0000000-0000-0000-0000-000000000001",
+    "agent_id": "golden-agent",
+    "depth": 0,
+    "event_type": "tool_call",
+    "symbol": "web_search",
+    "raw_symbol": "search_web",
+    "attributes": {
+      "param_schema_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "success"
+    },
+    "timestamp": "2026-09-07T00:00:01Z",
+    "framework": "custom",
+    "framework_schema_version": "1.0",
+    "adapter_version": "1.0.0",
+    "sequence_no": 1,
+    "status": "success"
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "c0000000-0000-0000-0000-000000000003",
+    "trace_id": "t0000000-0000-0000-0000-000000000001",
+    "span_id": "s0000000-0000-0000-0000-000000000001",
+    "agent_id": "golden-agent",
+    "depth": 0,
+    "event_type": "tool_result",
+    "symbol": "tool_result",
+    "raw_symbol": "search_result",
+    "attributes": {
+      "param_schema_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "success"
+    },
+    "timestamp": "2026-09-07T00:00:02Z",
+    "framework": "custom",
+    "framework_schema_version": "1.0",
+    "adapter_version": "1.0.0",
+    "sequence_no": 2,
+    "status": "success"
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "c0000000-0000-0000-0000-000000000004",
+    "trace_id": "t0000000-0000-0000-0000-000000000001",
+    "span_id": "s0000000-0000-0000-0000-000000000001",
+    "agent_id": "golden-agent",
+    "depth": 0,
+    "event_type": "memory_write",
+    "symbol": "memory_write",
+    "raw_symbol": "store_notes",
+    "attributes": {
+      "param_schema_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "success"
+    },
+    "timestamp": "2026-09-07T00:00:03Z",
+    "framework": "custom",
+    "framework_schema_version": "1.0",
+    "adapter_version": "1.0.0",
+    "sequence_no": 3,
+    "status": "success"
+  },
+  {
+    "schema_version": "1.0",
+    "event_id": "c0000000-0000-0000-0000-000000000005",
+    "trace_id": "t0000000-0000-0000-0000-000000000001",
+    "span_id": "s0000000-0000-0000-0000-000000000001",
+    "agent_id": "golden-agent",
+    "depth": 0,
+    "event_type": "terminate",
+    "symbol": "terminate",
+    "raw_symbol": "terminate",
+    "attributes": {
+      "param_schema_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "success"
+    },
+    "timestamp": "2026-09-07T00:00:04Z",
+    "framework": "custom",
+    "framework_schema_version": "1.0",
+    "adapter_version": "1.0.0",
+    "sequence_no": 4,
+    "status": "success"
+  }
+]

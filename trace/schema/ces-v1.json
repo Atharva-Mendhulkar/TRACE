@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace.dev/schema/ces-v1.json",
+  "title": "TRACE Canonical Event Schema v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_id",
+    "trace_id",
+    "span_id",
+    "agent_id",
+    "event_type",
+    "symbol",
+    "timestamp",
+    "framework",
+    "framework_schema_version",
+    "sequence_no",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "CES schema version."
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Globally unique ID for this event."
+    },
+    "trace_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the top-level execution this event belongs to."
+    },
+    "span_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of this event's local execution span."
+    },
+    "parent_span_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "Span ID of delegating parent event."
+    },
+    "session_id": {
+      "type": ["string", "null"],
+      "description": "Optional higher-level grouping."
+    },
+    "agent_id": {
+      "type": "string",
+      "description": "Stable identifier of the executing agent instance/role."
+    },
+    "role": {
+      "type": ["string", "null"],
+      "description": "Delegation role label."
+    },
+    "depth": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Nesting level of delegation."
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "tool_call",
+        "tool_result",
+        "delegate",
+        "retry",
+        "memory_read",
+        "memory_write",
+        "plan_step",
+        "error",
+        "terminate"
+      ],
+      "description": "Small, stable, framework-independent taxonomy."
+    },
+    "symbol": {
+      "type": "string",
+      "description": "Fine-grained canonicalized action identity."
+    },
+    "raw_symbol": {
+      "type": "string",
+      "description": "The framework-native, pre-canonicalization action name."
+    },
+    "attributes": {
+      "type": "object",
+      "required": ["param_schema_hash", "status"],
+      "properties": {
+        "param_schema_hash": {
+          "type": "string",
+          "description": "SHA-256 hash of parameter schema shape."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "failure", "timeout", "unknown"],
+          "description": "Outcome status of this event."
+        },
+        "latency_ms": {
+          "type": ["integer", "null"],
+          "description": "Wall-clock duration of the underlying operation."
+        },
+        "retry_count": {
+          "type": ["integer", "null"],
+          "description": "Attempt number, present when event_type='retry'."
+        }
+      }
+    },
+    "error": {
+      "type": ["object", "null"],
+      "properties": {
+        "error_class": {
+          "type": "string",
+          "description": "Coarse, framework-independent error category."
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "description": "Populated when event_type='error'."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event-emission time, ISO-8601 UTC."
+    },
+    "framework": {
+      "type": "string",
+      "enum": [
+        "mcp",
+        "langgraph",
+        "crewai",
+        "openai_agents_sdk",
+        "semantic_kernel",
+        "google_adk",
+        "autogen",
+        "custom"
+      ],
+      "description": "Source framework."
+    },
+    "framework_schema_version": {
+      "type": "string",
+      "description": "Version of framework event schema."
+    },
+    "adapter_version": {
+      "type": "string",
+      "description": "Version of TRACE adapter that produced this record."
+    },
+    "sequence_no": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonically increasing per-(trace_id, span_id) sequence number."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "failure", "timeout", "unknown"],
+      "description": "Top-level event status matching attributes.status."
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "timestamp_source": {
+          "type": "string",
+          "enum": ["framework", "ingestion"]
+        },
+        "ingested_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
