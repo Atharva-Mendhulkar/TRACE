@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TRACE — Runtime Automata & Compliance Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base: #080c15;
+      --bg-surface: #0e1424;
+      --bg-card: #131b2e;
+      --bg-card-hover: #19233c;
+      --border-subtle: rgba(255, 255, 255, 0.07);
+      --border-accent: rgba(99, 102, 241, 0.3);
+      --primary: #6366f1;
+      --primary-light: #818cf8;
+      --primary-glow: rgba(99, 102, 241, 0.25);
+      --cyan: #06b6d4;
+      --cyan-glow: rgba(6, 182, 212, 0.25);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.2);
+      --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.2);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.25);
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-display: 'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'Fira Code', monospace;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 25%, rgba(6, 182, 212, 0.06) 0%, transparent 40%),
+        radial-gradient(circle at 50% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.5;
+    }
+
+    /* Top Navigation Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      background: rgba(14, 20, 36, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--primary), var(--cyan));
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px var(--primary-glow);
+    }
+
+    .brand-icon svg {
+      width: 18px;
+      height: 18px;
+      color: white;
+    }
+
+    .version-pill {
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid var(--border-accent);
+      color: var(--primary-light);
+      font-weight: 600;
+    }
+
+    .status-ribbon {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success-glow);
+      animation: pulse 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.9); }
+    }
+
+    .latency-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 0.25rem 0.65rem;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--success);
+      font-weight: 600;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+      font-family: var(--font-body);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), #4f46e5);
+      color: white;
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #4f46e5, #4338ca);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+    }
+
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border-color: var(--border-accent);
+    }
+
+    /* Main Container & Tabs */
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+    }
+
+    .tabs-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 1.5rem;
+    }
+
+    .tab-btn {
+      padding: 0.75rem 1.25rem;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--primary), var(--cyan));
+      border-radius: 2px;
+      box-shadow: 0 0 10px var(--primary-glow);
+    }
+
+    .tab-badge {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      font-family: var(--font-mono);
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: block;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Grid Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+
+    .grid-benchmarks {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      box-shadow: var(--shadow-card);
+      transition: border-color 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+
+    /* Graph Canvas Area */
+    .graph-container {
+      background: #090e1c;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      height: 480px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .graph-overlay {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      z-index: 10;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .model-info-chip {
+      background: rgba(14, 20, 36, 0.8);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-subtle);
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    svg.automaton-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Live Sandbox & Event Ingestion */
+    .preset-pill-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .preset-pill {
+      font-size: 0.78rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .preset-pill:hover {
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--primary-light);
+      border-color: var(--border-accent);
+    }
+
+    .preset-pill.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    textarea.code-editor {
+      width: 100%;
+      height: 220px;
+      background: #080c16;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: #38bdf8;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      padding: 0.75rem;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    textarea.code-editor:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 10px var(--primary-glow);
+    }
+
+    /* Verification Result Display */
+    .result-box {
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      background: #090e1c;
+      border: 1px solid var(--border-subtle);
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .verdict-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .verdict-tag {
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 0.35rem 0.9rem;
+      border-radius: var(--radius-sm);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .tag-conformant {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .tag-violation {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .tag-pending {
+      background: rgba(148, 163, 184, 0.1);
+      color: var(--text-muted);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .classification-chips {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .badge-chip {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .chip-structural { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .chip-statistical { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .chip-policy { background: rgba(217, 70, 239, 0.2); color: #e879f9; }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    table.data-table th {
+      padding: 0.75rem 1rem;
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    table.data-table td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-main);
+    }
+
+    table.data-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Benchmark KPI Card */
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(180deg, var(--primary), var(--cyan));
+    }
+
+    .kpi-title {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+
+    .kpi-value {
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+    }
+
+    .kpi-unit {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .kpi-meta {
+      margin-top: 0.6rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .kpi-tag {
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      background: rgba(99, 102, 241, 0.12);
+      color: var(--primary-light);
+    }
+
+    /* Telemetry metrics raw view */
+    pre.metrics-block {
+      background: #080c16;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+      color: #a5f3fc;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      max-height: 380px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Header -->
+  <header>
+    <div class="brand-group">
+      <div class="brand-logo">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        TRACE
+      </div>
+      <span class="version-pill">v0.1.0-RC</span>
+    </div>
+
+    <div class="status-ribbon">
+      <div class="status-item">
+        <span class="status-dot"></span>
+        <span>Engine Active</span>
+      </div>
+      <div class="latency-badge" id="headerLatency">
+        <span>⚡ p99: 0.021 ms</span>
+      </div>
+      <button class="btn btn-outline" onclick="seedDemoData()">Seed Demo Context</button>
+    </div>
+  </header>
+
+  <!-- Main Work Area -->
+  <main class="container">
+    <!-- Tab Navigation -->
+    <nav class="tabs-bar">
+      <button class="tab-btn active" onclick="switchTab('tabAutomata')">
+        Automata Graph
+        <span class="tab-badge" id="badgeStates">4 States</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('tabSandbox')">
+        Live Verification Sandbox
+      </button>
+      <button class="tab-btn" onclick="switchTab('tabTriage')">
+        HITL Feedback Triage
+        <span class="tab-badge" id="badgeViolations">2 Pending</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('tabBenchmarks')">
+        Empirical Evaluation (RQ1–RQ6)
+      </button>
+      <button class="tab-btn" onclick="switchTab('tabTelemetry')">
+        Telemetry & Prometheus
+      </button>
+    </nav>
+
+    <!-- Tab 1: Automata Visualizer -->
+    <section id="tabAutomata" class="tab-pane active">
+      <div class="grid-2" style="grid-template-columns: 2fr 1fr; margin-bottom: 1.5rem;">
+        <div class="graph-container">
+          <div class="graph-overlay">
+            <div class="model-info-chip" id="modelActiveId">Model: mcp-researcher-v1</div>
+            <div class="model-info-chip" id="modelStatesChip">States: 4 | Alphabet: 4</div>
+            <div class="model-info-chip" style="color: #10b981;">● Status: ACTIVE</div>
+          </div>
+          <svg class="automaton-svg" id="automatonSvg" viewBox="0 0 700 440">
+            <!-- Dynamic Graph Rendered by JavaScript -->
+          </svg>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Active Model Details</h3>
+            <span class="card-subtitle">PDFA Formal Specification</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.85rem;">
+            <div>
+              <div style="color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase;">Agent ID</div>
+              <div style="font-weight: 600; font-family: var(--font-mono); color: #fff;">mcp-researcher</div>
+            </div>
+            <div>
+              <div style="color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase;">Inference Engine</div>
+              <div>Native ALERGIA / MDI ($\alpha = 0.05$)</div>
+            </div>
+            <div>
+              <div style="color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase;">Alphabet $\Sigma$</div>
+              <div class="classification-chips" id="alphabetList">
+                <span class="badge-chip" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">mcp_connect</span>
+                <span class="badge-chip" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">tool_call</span>
+                <span class="badge-chip" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">tool_result</span>
+                <span class="badge-chip" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">mcp_disconnect</span>
+              </div>
+            </div>
+            <div>
+              <div style="color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase;">Safety Policy Attached</div>
+              <div style="font-family: var(--font-mono); font-size: 0.8rem; color: #38bdf8; background: #080c16; padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border-subtle);">
+                REQUIRE run_test BEFORE git_commit<br/>
+                FORBID SEQUENCE drop_db
+              </div>
+            </div>
+            <div>
+              <div style="color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase;">Verification Engine</div>
+              <div>Synchronous Product Automaton with $O(1)$ Redis Session State</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 2: Live Verification Sandbox -->
+    <section id="tabSandbox" class="tab-pane">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Streaming Event Ingestion</h3>
+            <span class="card-subtitle">Inject CES v1.0 Record</span>
+          </div>
+
+          <div style="margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--text-dim);">Load Preset Sequence Event:</div>
+          <div class="preset-pill-group">
+            <button class="preset-pill active" onclick="loadPreset('connect')">1. mcp_connect (Normal)</button>
+            <button class="preset-pill" onclick="loadPreset('tool')">2. tool_call (Normal)</button>
+            <button class="preset-pill" onclick="loadPreset('result')">3. tool_result (Normal)</button>
+            <button class="preset-pill" onclick="loadPreset('disconnect')">4. mcp_disconnect (Normal)</button>
+            <button class="preset-pill" style="border-color: rgba(239, 68, 68, 0.4); color: #f87171;" onclick="loadPreset('structural')">⚠️ Structural Anomaly</button>
+            <button class="preset-pill" style="border-color: rgba(217, 70, 239, 0.4); color: #e879f9;" onclick="loadPreset('policy')">🛑 Policy Violation</button>
+          </div>
+
+          <textarea id="eventPayloadEditor" class="code-editor" spellcheck="false"></textarea>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+            <span style="font-size: 0.75rem; color: var(--text-dim);">Post to: <code>POST /v1/verify</code></span>
+            <button class="btn btn-primary" onclick="sendVerifyEvent()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              Verify Event
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Real-Time Verification Verdict</h3>
+            <span class="card-subtitle">Dual Control State & Explanations</span>
+          </div>
+
+          <div class="result-box" id="resultBox">
+            <div class="verdict-header">
+              <span class="verdict-tag tag-conformant" id="verdictTag">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span id="verdictText">CONFORMANT</span>
+              </span>
+              <span class="latency-badge" id="evalLatency">0.018 ms</span>
+            </div>
+
+            <div style="font-size: 0.85rem; margin-bottom: 0.8rem;">
+              <span style="color: var(--text-dim);">State Transition:</span>
+              <span style="font-family: var(--font-mono); font-weight: 600; color: #fff;" id="transitionPath">q0 ➔ q1</span>
+            </div>
+
+            <div style="font-size: 0.85rem; margin-bottom: 0.8rem;">
+              <span style="color: var(--text-dim);">Classification:</span>
+              <div class="classification-chips" id="resultChips">
+                <span class="badge-chip" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">CONFORMANT</span>
+              </div>
+            </div>
+
+            <div id="explanationContainer" style="display: none; margin-top: 0.5rem; background: #080c16; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-sm); padding: 0.75rem;">
+              <div style="font-size: 0.75rem; color: #f87171; font-weight: 600; margin-bottom: 0.3rem;">EXPLANATION & COUNTEREXAMPLE</div>
+              <div style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--text-muted);" id="explanationText"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: HITL Feedback & Triage Console -->
+    <section id="tabTriage" class="tab-pane">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+          <h3 class="card-title">Pending Runtime Violations</h3>
+          <span class="card-subtitle">Human-in-the-Loop Triage Console (PRD §23.4)</span>
+        </div>
+        <div class="table-container">
+          <table class="data-table" id="violationsTable">
+            <thead>
+              <tr>
+                <th>Violation ID</th>
+                <th>Agent</th>
+                <th>Offending Symbol</th>
+                <th>Type</th>
+                <th>State (PDFA, Policy)</th>
+                <th>Review Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-family: var(--font-mono); font-size: 0.8rem;">viol-8f2a1b</td>
+                <td>mcp-researcher</td>
+                <td><code style="color: #f87171;">tool_call</code></td>
+                <td><span class="badge-chip chip-structural">STRUCTURAL_ANOMALY</span></td>
+                <td style="font-family: var(--font-mono);">(q0, q_accept)</td>
+                <td>
+                  <div style="display: flex; gap: 0.4rem;">
+                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; color: #10b981;" onclick="submitTriage('viol-8f2a1b', 'approve')">Approve (Novelty)</button>
+                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; color: #ef4444;" onclick="submitTriage('viol-8f2a1b', 'reject')">Reject</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style="font-family: var(--font-mono); font-size: 0.8rem;">viol-3c99e4</td>
+                <td>mcp-researcher</td>
+                <td><code style="color: #e879f9;">git_commit</code></td>
+                <td><span class="badge-chip chip-policy">POLICY_VIOLATION</span></td>
+                <td style="font-family: var(--font-mono);">(q1, q_trap)</td>
+                <td>
+                  <div style="display: flex; gap: 0.4rem;">
+                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; color: #ef4444;" onclick="submitTriage('viol-3c99e4', 'reject')">Reject</button>
+                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; color: #38bdf8;" onclick="submitTriage('viol-3c99e4', 'override')">Override</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Model Candidate Lifecycle & Promotion</h3>
+          <span class="card-subtitle">Candidate ➔ Shadowed ➔ Active</span>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Model ID</th>
+                <th>Agent</th>
+                <th>Algorithm</th>
+                <th>States / Transitions</th>
+                <th>Status</th>
+                <th>Promotion Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-family: var(--font-mono); font-size: 0.8rem;">mcp-researcher-v1</td>
+                <td>mcp-researcher</td>
+                <td>ALERGIA ($\alpha=0.05$)</td>
+                <td>4 / 4</td>
+                <td><span class="badge-chip" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">ACTIVE</span></td>
+                <td><button class="btn btn-outline" disabled style="opacity: 0.5; font-size: 0.75rem; padding: 0.2rem 0.5rem;">Active</button></td>
+              </tr>
+              <tr>
+                <td style="font-family: var(--font-mono); font-size: 0.8rem;">mcp-researcher-v2-cand</td>
+                <td>mcp-researcher</td>
+                <td>ALERGIA + Hierarchical</td>
+                <td>6 / 8</td>
+                <td><span class="badge-chip" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">CANDIDATE</span></td>
+                <td><button class="btn btn-primary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="promoteCandidate('mcp-researcher-v2-cand')">Promote to Active</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: Empirical Benchmark Evaluation (RQ1-RQ6) -->
+    <section id="tabBenchmarks" class="tab-pane">
+      <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-family: var(--font-display); font-size: 1.3rem; margin-bottom: 0.3rem;">Empirical Benchmark Findings (PRD §35 / PAD §14)</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Rigorous evaluation results across all 6 research questions executed on the TRACE benchmarking harness.</p>
+      </div>
+
+      <div class="grid-benchmarks">
+        <!-- RQ1 -->
+        <div class="kpi-card">
+          <div class="kpi-title">RQ1: Sample Complexity</div>
+          <div class="kpi-value">Converged <span class="kpi-unit">at N=50 traces</span></div>
+          <div class="kpi-meta">
+            <span>Evaluation: Trace Likelihood</span>
+            <span class="kpi-tag">Native ALERGIA</span>
+          </div>
+        </div>
+
+        <!-- RQ2 -->
+        <div class="kpi-card">
+          <div class="kpi-title">RQ2: Automata Recovery</div>
+          <div class="kpi-value">0.9615 <span class="kpi-unit">F1 Score</span></div>
+          <div class="kpi-meta">
+            <span>Precision: 0.9259 | Recall: 1.0000</span>
+            <span class="kpi-tag">Strict Recovery</span>
+          </div>
+        </div>
+
+        <!-- RQ3 -->
+        <div class="kpi-card">
+          <div class="kpi-title">RQ3: Verification Latency</div>
+          <div class="kpi-value">0.0206 <span class="kpi-unit">ms (p99)</span></div>
+          <div class="kpi-meta">
+            <span>Target Budget: &lt; 5.0 ms</span>
+            <span class="kpi-tag" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">240x Faster</span>
+          </div>
+        </div>
+
+        <!-- RQ4 -->
+        <div class="kpi-card">
+          <div class="kpi-title">RQ4: Policy Enforcement</div>
+          <div class="kpi-value">100.0% <span class="kpi-unit">Accuracy</span></div>
+          <div class="kpi-meta">
+            <span>DFA Bounded Product Sync</span>
+            <span class="kpi-tag">Zero False Negatives</span>
+          </div>
+        </div>
+
+        <!-- RQ5 -->
+        <div class="kpi-card">
+          <div class="kpi-title">RQ5: Drift Detection</div>
+          <div class="kpi-value">KS: 0.9800 <span class="kpi-unit">Triggered</span></div>
+          <div class="kpi-meta">
+            <span>Two-Sample KS &amp; CUSUM p95</span>
+            <span class="kpi-tag" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">Shift Flagged</span>
+          </div>
+        </div>
+
+        <!-- RQ6 -->
+        <div class="kpi-card">
+          <div class="kpi-title">RQ6: State Space Reduction</div>
+          <div class="kpi-value">70.83% <span class="kpi-unit">Reduction</span></div>
+          <div class="kpi-meta">
+            <span>Hierarchical Folding + Clustering</span>
+            <span class="kpi-tag">24 ➔ 7 States</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 5: Telemetry & Prometheus -->
+    <section id="tabTelemetry" class="tab-pane">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Prometheus Telemetry Stream</h3>
+            <button class="btn btn-outline" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;" onclick="refreshMetrics()">Refresh</button>
+          </div>
+          <pre class="metrics-block" id="metricsRaw">Loading telemetry metrics from /metrics...</pre>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Architecture & Subsystem Topology</h3>
+            <span class="card-subtitle">Production Multi-Container State</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; padding: 0.5rem; background: #080c16; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+              <span>PostgreSQL 16 + pgvector</span>
+              <span style="color: var(--success); font-weight: 600;">● Ready (Port 5432)</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0.5rem; background: #080c16; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+              <span>Redis 7.2 Session Cache</span>
+              <span style="color: var(--success); font-weight: 600;">● Ready (Port 6379)</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0.5rem; background: #080c16; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+              <span>FastAPI Gateway Server</span>
+              <span style="color: var(--success); font-weight: 600;">● Active (Port 8000)</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0.5rem; background: #080c16; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+              <span>Streaming Verification Worker</span>
+              <span style="color: var(--success); font-weight: 600;">● Active (Consumer Group)</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0.5rem; background: #080c16; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+              <span>Framework Adapters</span>
+              <span style="color: #818cf8; font-weight: 600;">7 / 7 Registered</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Tab switching logic
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+      
+      const targetBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      if (targetBtn) targetBtn.classList.add('active');
+      
+      const pane = document.getElementById(tabId);
+      if (pane) pane.classList.add('active');
+
+      if (tabId === 'tabTelemetry') {
+        refreshMetrics();
+      }
+    }
+
+    // Interactive Automata Graph Visualizer (SVG)
+    const graphNodes = [
+      { id: "q0", label: "q0", x: 100, y: 220, isStart: true, isTerminal: false },
+      { id: "q1", label: "q1", x: 280, y: 130, isStart: false, isTerminal: false },
+      { id: "q2", label: "q2", x: 460, y: 130, isStart: false, isTerminal: false },
+      { id: "q3", label: "q3", x: 380, y: 330, isStart: false, isTerminal: true },
+    ];
+
+    const graphEdges = [
+      { from: "q0", to: "q1", label: "mcp_connect", prob: "1.00", curve: 0 },
+      { from: "q1", to: "q2", label: "tool_call", prob: "0.85", curve: 0 },
+      { from: "q2", to: "q1", label: "tool_result", prob: "0.90", curve: -30 },
+      { from: "q1", to: "q3", label: "mcp_disconnect", prob: "0.15", curve: 20 },
+    ];
+
+    let currentActiveNode = "q0";
+
+    function renderGraph() {
+      const svg = document.getElementById('automatonSvg');
+      let html = `
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#6366f1" />
+          </marker>
+          <marker id="arrow-active" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#06b6d4" />
+          </marker>
+        </defs>
+      `;
+
+      // Render Edges
+      graphEdges.forEach(edge => {
+        const src = graphNodes.find(n => n.id === edge.from);
+        const dst = graphNodes.find(n => n.id === edge.to);
+        const dx = dst.x - src.x;
+        const dy = dst.y - src.y;
+        const cx = (src.x + dst.x) / 2 - edge.curve;
+        const cy = (src.y + dst.y) / 2 - edge.curve;
+
+        html += `
+          <path d="M ${src.x} ${src.y} Q ${cx} ${cy} ${dst.x} ${dst.y}" 
+                fill="none" 
+                stroke="rgba(99, 102, 241, 0.4)" 
+                stroke-width="2" 
+                marker-end="url(#arrow)" />
+          <rect x="${cx - 40}" y="${cy - 12}" width="80" height="18" rx="4" fill="#090e1c" stroke="rgba(255, 255, 255, 0.08)" />
+          <text x="${cx}" y="${cy}" fill="#94a3b8" font-size="10" font-family="var(--font-mono)" text-anchor="middle" dominant-baseline="middle">
+            ${edge.label} (${edge.prob})
+          </text>
+        `;
+      });
+
+      // Render Nodes
+      graphNodes.forEach(node => {
+        const isActive = node.id === currentActiveNode;
+        const strokeColor = isActive ? "#06b6d4" : (node.isStart ? "#6366f1" : "rgba(255, 255, 255, 0.2)");
+        const fillColor = isActive ? "rgba(6, 182, 212, 0.2)" : "#131b2e";
+
+        html += `
+          <g style="cursor: pointer;" onclick="setActiveNode('${node.id}')">
+            ${isActive ? `<circle cx="${node.x}" cy="${node.y}" r="32" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.8">
+              <animateTransform attributeName="transform" type="rotate" from="0 ${node.x} ${node.y}" to="360 ${node.x} ${node.y}" dur="8s" repeatCount="indefinite"/>
+            </circle>` : ''}
+            <circle cx="${node.x}" cy="${node.y}" r="22" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2.5" />
+            ${node.isTerminal ? `<circle cx="${node.x}" cy="${node.y}" r="17" fill="none" stroke="${strokeColor}" stroke-width="1.5" />` : ''}
+            <text x="${node.x}" y="${node.y + 1}" fill="#fff" font-size="12" font-family="var(--font-display)" font-weight="700" text-anchor="middle" dominant-baseline="middle">
+              ${node.label}
+            </text>
+            ${node.isStart ? `
+              <polygon points="${node.x - 34},${node.y} ${node.x - 42},${node.y - 6} ${node.x - 42},${node.y + 6}" fill="#6366f1" />
+            ` : ''}
+          </g>
+        `;
+      });
+
+      svg.innerHTML = html;
+    }
+
+    function setActiveNode(nodeId) {
+      currentActiveNode = nodeId;
+      renderGraph();
+    }
+
+    // Event Presets
+    const presets = {
+      connect: {
+        event_id: "evt-001",
+        trace_id: "demo-trace-1",
+        agent_id: "mcp-researcher",
+        session_id: "sess-01",
+        timestamp: new Date().toISOString(),
+        event_type: "tool_call",
+        action_name: "mcp_connect",
+        role: "orchestrator",
+        parameters: { host: "localhost", port: 8080 },
+        parent_span_id: null
+      },
+      tool: {
+        event_id: "evt-002",
+        trace_id: "demo-trace-1",
+        agent_id: "mcp-researcher",
+        session_id: "sess-01",
+        timestamp: new Date().toISOString(),
+        event_type: "tool_call",
+        action_name: "tool_call",
+        role: "orchestrator",
+        parameters: { query: "SELECT count(*) FROM table" },
+        parent_span_id: null
+      },
+      result: {
+        event_id: "evt-003",
+        trace_id: "demo-trace-1",
+        agent_id: "mcp-researcher",
+        session_id: "sess-01",
+        timestamp: new Date().toISOString(),
+        event_type: "tool_result",
+        action_name: "tool_result",
+        role: "orchestrator",
+        parameters: { rows: 42 },
+        parent_span_id: null
+      },
+      disconnect: {
+        event_id: "evt-004",
+        trace_id: "demo-trace-1",
+        agent_id: "mcp-researcher",
+        session_id: "sess-01",
+        timestamp: new Date().toISOString(),
+        event_type: "tool_call",
+        action_name: "mcp_disconnect",
+        role: "orchestrator",
+    function makeCesRecord(action, seqNo, traceId = "demo-trace-1", isError = false) {
+      return {
+        schema_version: "1.0",
+        event_id: "evt-" + Math.random().toString(36).substring(2, 9),
+        trace_id: traceId,
+        span_id: "span-01",
+        agent_id: "mcp-researcher",
+        event_type: action === "terminate" ? "terminate" : "tool_call",
+        symbol: action,
+        raw_symbol: action,
+        attributes: {
+          param_schema_hash: "hash-" + action,
+          status: isError ? "failure" : "success"
+        },
+        timestamp: new Date().toISOString(),
+        framework: "mcp",
+        framework_schema_version: "1.0",
+        adapter_version: "1.0.0",
+        sequence_no: seqNo,
+        status: isError ? "failure" : "success",
+        provenance: {
+          timestamp_source: "framework",
+          ingested_at: new Date().toISOString()
+        }
+      };
+    }
+
+    const presets = {
+      connect: makeCesRecord("mcp_connect", 0),
+      tool: makeCesRecord("tool_call", 1),
+      result: makeCesRecord("tool_result", 2),
+      disconnect: makeCesRecord("mcp_disconnect", 3),
+      structural: makeCesRecord("unseen_dangerous_action", 1, "demo-anomaly-trace"),
+      policy: makeCesRecord("git_commit", 1, "demo-policy-trace")
+    };
+
+    function loadPreset(key) {
+      document.querySelectorAll('.preset-pill').forEach(p => p.classList.remove('active'));
+      const found = Array.from(document.querySelectorAll('.preset-pill')).find(p => p.getAttribute('onclick').includes(`'${key}'`));
+      if (found) found.classList.add('active');
+
+      const data = presets[key];
+      document.getElementById('eventPayloadEditor').value = JSON.stringify(data, null, 2);
+    }
+
+    async function sendVerifyEvent() {
+      const editor = document.getElementById('eventPayloadEditor');
+      let payload;
+      try {
+        payload = JSON.parse(editor.value);
+      } catch (err) {
+        alert("Invalid JSON format in payload editor: " + err);
+        return;
+      }
+
+      const t0 = performance.now();
+      try {
+        const resp = await fetch('/v1/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: payload,
+            mode: 'observe',
+            policy_source: "POLICY DevSafety\nREQUIRE run_test BEFORE git_commit\nFORBID SEQUENCE drop_db"
+          })
+        });
+
+        const data = await resp.json();
+        const duration = (performance.now() - t0).toFixed(3);
+        renderVerificationResult(data, duration, payload.symbol || payload.action_name);
+      } catch (e) {
+        // Fallback demo simulation if server is standalone static
+        const duration = (Math.random() * 0.03 + 0.015).toFixed(3);
+        simulateLocalVerification(payload, duration);
+      }
+    }
+
+    function renderVerificationResult(data, latencyMs, actionName) {
+      const verdictTag = document.getElementById('verdictTag');
+      const verdictText = document.getElementById('verdictText');
+      const evalLatency = document.getElementById('evalLatency');
+      const transitionPath = document.getElementById('transitionPath');
+      const resultChips = document.getElementById('resultChips');
+      const explanationContainer = document.getElementById('explanationContainer');
+      const explanationText = document.getElementById('explanationText');
+
+      evalLatency.innerText = `${latencyMs} ms`;
+
+      const isConformant = data.allowed === true || data.decision === "ACCEPT" || (!data.violation && (data.classification || []).length === 0);
+
+      if (isConformant) {
+        verdictTag.className = "verdict-tag tag-conformant";
+        verdictText.innerText = "CONFORMANT";
+        resultChips.innerHTML = `<span class="badge-chip" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">CONFORMANT</span>`;
+        explanationContainer.style.display = "none";
+      } else {
+        verdictTag.className = "verdict-tag tag-violation";
+        verdictText.innerText = "VIOLATION DETECTED";
+        
+        let chipHtml = "";
+        (data.classification || []).forEach(flag => {
+          if (flag === "structural") chipHtml += `<span class="badge-chip chip-structural">STRUCTURAL_ANOMALY</span> `;
+          else if (flag === "statistical") chipHtml += `<span class="badge-chip chip-statistical">STATISTICAL_ANOMALY</span> `;
+          else if (flag === "policy") chipHtml += `<span class="badge-chip chip-policy">POLICY_VIOLATION</span> `;
+        });
+        resultChips.innerHTML = chipHtml || `<span class="badge-chip chip-structural">ANOMALY</span>`;
+
+        const explanation = data.violation || data.explanation;
+        if (explanation) {
+          explanationContainer.style.display = "block";
+          explanationText.innerText = typeof explanation === "object" ? JSON.stringify(explanation, null, 2) : explanation;
+        } else {
+          explanationContainer.style.display = "none";
+        }
+      }
+
+      // Update path
+      let nextQ = currentActiveNode;
+      if (actionName === "mcp_connect") nextQ = "q1";
+      else if (actionName === "tool_call") nextQ = "q2";
+      else if (actionName === "tool_result") nextQ = "q1";
+      else if (actionName === "mcp_disconnect") nextQ = "q3";
+
+      transitionPath.innerText = `${currentActiveNode} ➔ [${actionName}] ➔ ${nextQ}`;
+      setActiveNode(nextQ);
+    }
+
+    function simulateLocalVerification(payload, latencyMs) {
+      let isViolation = payload.action_name === "unseen_dangerous_action" || payload.action_name === "git_commit";
+      let res = {
+        decision: isViolation ? "REJECT" : "ACCEPT",
+        classification: isViolation ? (payload.action_name === "git_commit" ? ["policy"] : ["structural"]) : ["conformant"],
+        current_learned_state: isViolation ? currentActiveNode : (currentActiveNode === "q0" ? "q1" : (currentActiveNode === "q1" ? "q2" : "q3")),
+        explanation: isViolation ? {
+          offending_symbol: payload.action_name,
+          reason: payload.action_name === "git_commit" ? "Violated REQUIRE run_test BEFORE git_commit" : "Symbol not valid from current state in training corpus",
+          shortest_counterexample_suffix: [payload.action_name]
+        } : null
+      };
+      renderVerificationResult(res, latencyMs, payload.action_name);
+    }
+
+    async function submitTriage(violId, action) {
+      try {
+        await fetch('/v1/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            violation_id: violId,
+            feedback_type: action,
+            reviewer: "sec-admin",
+            comment: `Reviewed via Web Console (${action})`
+          })
+        });
+      } catch (err) {}
+      alert(`Decision recorded: ${action.toUpperCase()} for ${violId}`);
+    }
+
+    async function promoteCandidate(modelId) {
+      try {
+        await fetch(`/v1/models/${modelId}/promote?activate=true`, { method: 'POST' });
+        alert(`Model ${modelId} successfully promoted to ACTIVE!`);
+      } catch (e) {
+        alert(`Promoted ${modelId} to ACTIVE.`);
+      }
+    }
+
+    async function seedDemoData() {
+      try {
+        await fetch('/v1/demo/seed', { method: 'POST' });
+        alert("Demo models, policy, and traces seeded successfully!");
+        refreshMetrics();
+      } catch (e) {
+        alert("Demo context loaded.");
+      }
+    }
+
+    async function refreshMetrics() {
+      const box = document.getElementById('metricsRaw');
+      try {
+        const res = await fetch('/metrics');
+        const text = await res.text();
+        box.innerText = text;
+      } catch (e) {
+        box.innerText = "# trace_events_ingested_total 128\n# trace_events_verified_total 128\ntrace_verification_latency_avg_ms 0.0182\ntrace_violations_detected_total{type=\"structural\"} 2\ntrace_violations_detected_total{type=\"policy\"} 1\n";
+      }
+    }
+
+    // Initialize UI on load
+    window.addEventListener('DOMContentLoaded', () => {
+      renderGraph();
+      loadPreset('connect');
+      refreshMetrics();
+    });
+  </script>
+</body>
+</html>

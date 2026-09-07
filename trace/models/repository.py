@@ -41,7 +41,7 @@ class ModelRepository:
 
     def __init__(self, db_path: Union[str, Path] = ":memory:"):
         self.db_path = str(db_path)
-        self._shared_conn = sqlite3.connect(":memory:") if self.db_path == ":memory:" else None
+        self._shared_conn = sqlite3.connect(":memory:", check_same_thread=False) if self.db_path == ":memory:" else None
         if self._shared_conn:
             self._shared_conn.row_factory = sqlite3.Row
         self._init_db()
@@ -49,7 +49,7 @@ class ModelRepository:
     def _get_conn(self) -> sqlite3.Connection:
         if self._shared_conn:
             return self._shared_conn
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         return conn
 

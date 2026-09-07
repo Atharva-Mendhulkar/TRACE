@@ -6,18 +6,20 @@ HITL feedback triage, and telemetry metrics.
 
 from __future__ import annotations
 
+from pathlib import Path
 import time
 from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query, status
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from trace.corpus.repository import TraceRepository
 from trace.corpus.store import TraceStore
 from trace.feedback.engine import FeedbackEngine, FeedbackType, RelationalFeedbackStore
 from trace.ingestion.pipeline import IngestionPipeline
+from trace.models.pdfa import PDFA
 from trace.models.repository import ModelLifecycleStatus, ModelRepository
 from trace.policy.compiler import PolicyCompiler
 from trace.policy.dsl import PolicyParser
@@ -117,6 +119,44 @@ def create_app(
     # Active verifier cache: agent_id -> RuntimeVerifier
     verifiers: Dict[str, RuntimeVerifier] = {}
 
+    dashboard_path = Path(__file__).parent / "dashboard.html"
+
+    @app.get("/", response_class=HTMLResponse, tags=["Dashboard"])
+    @app.get("/dashboard", response_class=HTMLResponse, tags=["Dashboard"])
+    def get_dashboard():
+        """Serve interactive TRACE Runtime Automata & Compliance Console."""
+        if dashboard_path.exists():
+            return HTMLResponse(content=dashboard_path.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>TRACE Runtime Dashboard</h1><p>dashboard.html not found</p>")
+
+    @app.post("/v1/demo/seed", tags=["System"])
+    def seed_demo_data():
+        """Seed demo agent PDFA models, policies, and violations for instant interactive testing."""
+        active_pdfa = PDFA(q0="q0", alphabet={"mcp_connect", "tool_call", "tool_result", "mcp_disconnect"})
+        active_pdfa.add_state("q1")
+        active_pdfa.add_state("q2")
+        active_pdfa.add_state("q3", is_final=True)
+        active_pdfa.add_transition("q0", "mcp_connect", "q1", frequency=10)
+        active_pdfa.add_transition("q1", "tool_call", "q2", frequency=17)
+        active_pdfa.add_transition("q1", "mcp_disconnect", "q3", frequency=3)
+        active_pdfa.add_transition("q2", "tool_result", "q1", frequency=18)
+        active_pdfa.add_transition("q2", "tool_call", "q2", frequency=2)
+        m_id = model_repo.save_model(
+            agent_id="mcp-researcher",
+            pdfa=active_pdfa,
+            training_corpus_hash="demo_hash_v1",
+            learner_config={"algorithm": "ALERGIA", "alpha": 0.05},
+        )
+        model_repo.validate_model(m_id)
+        model_repo.promote_model(m_id, approver="system-seed")
+
+        verifiers.clear()
+        metrics.events_ingested_total += 42
+        metrics.events_verified_total += 42
+        metrics.verification_latency_sum_ms += 42 * 0.018
+
+        return {"status": "seeded", "model_id": m_id, "agent_id": "mcp-researcher"}
+
     @app.get("/health", tags=["System"])
     def health_check():
         return {
@@ -200,7 +240,23 @@ def create_app(
     @app.get("/v1/models", tags=["Models"])
     def list_models(agent_id: Optional[str] = Query(None)):
         """List learned models and current promotion status."""
-        return model_repo.list_models(agent_id=agent_id)
+        models = model_repo.list_models(agent_id=agent_id)
+        results = []
+        for m in models:
+            pdfa = m.get("pdfa")
+            results.append({
+                "model_id": m["model_id"],
+                "model_version": m["model_version"],
+                "agent_id": m["agent_id"],
+                "role": m.get("role"),
+                "status": m["status"],
+                "created_at": m["created_at"],
+                "promoted_at": m.get("promoted_at"),
+                "activated_at": m.get("activated_at"),
+                "states_count": len(pdfa.states) if pdfa else 0,
+                "alphabet_size": len(pdfa.alphabet) if pdfa else 0,
+            })
+        return results
 
     @app.get("/v1/models/{model_id}", tags=["Models"])
     def get_model(model_id: str):

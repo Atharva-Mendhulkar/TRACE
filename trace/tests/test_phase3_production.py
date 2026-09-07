@@ -61,6 +61,17 @@ def test_api_health_and_metrics():
     assert "trace_events_ingested_total" in m_resp.text
     assert "trace_verification_latency_avg_ms" in m_resp.text
 
+    # Dashboard HTML
+    dash_resp = client.get("/dashboard")
+    assert dash_resp.status_code == 200
+    assert "TRACE" in dash_resp.text
+    assert "Automata Graph" in dash_resp.text
+
+    # Demo Seed
+    seed_resp = client.post("/v1/demo/seed")
+    assert seed_resp.status_code == 200
+    assert seed_resp.json()["status"] == "seeded"
+
 
 def test_api_events_ingestion_and_streaming_verify(tmp_path):
     db_file = str(tmp_path / "api_test.sqlite")
