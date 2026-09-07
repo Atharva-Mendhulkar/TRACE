@@ -1,5 +1,6 @@
 """
 TRACE Command Line Interface (PRD §30).
+Enhanced with semantic CLI elements inspired by R/Posit cli and Python rich.
 """
 
 from __future__ import annotations
@@ -12,6 +13,22 @@ from pathlib import Path
 from typing import List, Optional
 
 from trace.adapters.base import list_adapters
+from trace.cli.ui import (
+    cli_alert,
+    cli_alert_danger,
+    cli_alert_info,
+    cli_alert_success,
+    cli_alert_warning,
+    cli_banner,
+    cli_box,
+    cli_h1,
+    cli_h2,
+    cli_h3,
+    cli_kv,
+    cli_rule,
+    cli_table,
+    status_pill,
+)
 from trace.corpus.store import TraceStore
 from trace.inference.flexfringe import FlexFringeRunner
 from trace.inference.native_learner import NativeStateMergingLearner
@@ -24,8 +41,17 @@ from trace.verification.verifier import HierarchicalRuntimeVerifier, RuntimeVeri
 DEFAULT_DB = "trace_data.sqlite"
 
 
-def main(args: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(
+class TraceArgumentParser(argparse.ArgumentParser):
+    """Custom ArgumentParser that prints the rich TRACE banner on help or error."""
+
+    def format_help(self) -> str:
+        banner = cli_banner(print_out=False)
+        help_text = super().format_help()
+        return f"{banner}\n{help_text}"
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = TraceArgumentParser(
         prog="trace",
         description="TRACE: Trace-based Runtime Automata for Compliance and Enforcement",
     )
@@ -76,7 +102,7 @@ def main(args: Optional[List[str]] = None) -> int:
     pol_val = pol_sub.add_parser("validate", help="Parse and validate a policy file")
     pol_val.add_argument("file", help="Path to .policy file")
 
-    # 7. trace model list / inspect
+    # 7. trace model list / inspect / promote
     mod_p = subparsers.add_parser("model", help="Model repository management")
     mod_sub = mod_p.add_subparsers(dest="model_cmd", required=True)
     mod_list = mod_sub.add_parser("list", help="List trained models")
@@ -124,7 +150,7 @@ def main(args: Optional[List[str]] = None) -> int:
         help="Research Question to evaluate",
     )
 
-    # 10. trace ingest-benchmark <path> [--dataset <swebench|osworld|auto>] [--db <db>] [--train]
+    # 11. trace ingest-benchmark <path> [--dataset <swebench|osworld|auto>] [--db <db>] [--train]
     bench_ingest_p = subparsers.add_parser(
         "ingest-benchmark",
         help="Ingest real-world benchmark trajectories (SWE-bench / OSWorld) into CES storage",
@@ -143,6 +169,18 @@ def main(args: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Automatically train a PDFA protocol model from the ingested traces",
     )
+
+    return parser
+
+
+def main(args: Optional[List[str]] = None) -> int:
+    parser = build_parser()
+
+    # If no arguments provided, display the rich banner and help
+    actual_args = sys.argv[1:] if args is None else args
+    if not actual_args:
+        parser.print_help()
+        return 0
 
     parsed = parser.parse_args(args)
 
@@ -182,21 +220,32 @@ def main(args: Optional[List[str]] = None) -> int:
 
 
 def cmd_ingest(path_str: str, framework: Optional[str], db_path: str) -> int:
+    cli_h2(f"Ingesting Framework Events")
+    cli_kv("Event Source", path_str)
+    cli_kv("Framework Hint", framework or "auto-detect")
+    cli_kv("Target DB", db_path)
+
     store = TraceStore(db_path)
     pipeline = IngestionPipeline(trace_store=store)
     try:
         res = pipeline.ingest_file(path_str, framework=framework)
-        print(f"Ingestion summary for {path_str}:")
-        print(f"  Accepted:   {len(res.accepted)}")
-        print(f"  Duplicates: {len(res.duplicates)}")
-        print(f"  Rejected:   {len(res.rejected)}")
+        metrics = [
+            ["Accepted CES Events", str(len(res.accepted))],
+            ["Duplicate Events", str(len(res.duplicates))],
+            ["Rejected Events", str(len(res.rejected))],
+        ]
+        cli_table(["Ingestion Metric", "Count"], metrics)
+
         if res.rejected:
-            print("\nRejections detail:")
+            cli_alert_danger(f"Ingestion encountered {len(res.rejected)} rejection(s):")
             for r in res.rejected[:5]:
-                print(f"  - {r.get('reason')}")
-        return 0 if not res.rejected else 1
+                cli_alert(f"Reason: {r.get('reason', 'Unknown error')}")
+            return 1
+
+        cli_alert_success(f"Successfully processed and stored {len(res.accepted)} events.")
+        return 0
     except Exception as e:
-        print(f"Error during ingestion: {e}", file=sys.stderr)
+        cli_alert_danger(f"Error during ingestion: {e}")
         return 1
 
 
@@ -213,14 +262,20 @@ def cmd_train(parsed: argparse.Namespace) -> int:
         target_name = f"agent '{parsed.agent_id}'"
         target_id = parsed.agent_id
     else:
-        print("Error: Either --agent-id or --role must be specified for training.", file=sys.stderr)
+        cli_alert_danger("Either --agent-id or --role must be specified for training.")
         return 1
 
     if not corpus:
-        print(f"No traces found for {target_name} in {parsed.db}", file=sys.stderr)
+        cli_alert_danger(f"No traces found for {target_name} in {parsed.db}")
         return 1
 
-    print(f"Loaded {len(corpus)} traces for training {target_name}.")
+    cli_h2(f"Training Protocol Automata: {target_name}")
+    cli_kv("Target ID", target_id)
+    cli_kv("Inference Engine", parsed.engine)
+    cli_kv("Merge Heuristic", parsed.heuristic)
+    cli_kv("Significance (α)", parsed.alpha)
+    cli_kv("Training Traces", len(corpus))
+
     corpus_hash = hashlib.sha256(json.dumps(corpus, sort_keys=True).encode()).hexdigest()
 
     # Train via selected engine
@@ -251,26 +306,41 @@ def cmd_train(parsed: argparse.Namespace) -> int:
         learner_config=config,
     )
 
-    print(f"Model trained successfully!")
-    print(f"  Model ID:     {model_id}")
-    print(f"  Target:       {target_name}")
-    print(f"  States:       {len(pdfa.states)}")
-    print(f"  Transitions:  {len(pdfa.delta)}")
-    print(f"  Alphabet:     {sorted(list(pdfa.alphabet))}")
-
-    # Run auto-validation
     all_symbols = sorted(list({s for t in corpus for s in t}))
     val_res = repo.validate_model(model_id, training_alphabet=all_symbols)
-    print(f"  Validation:   {'PASSED (Status: CANDIDATE)' if val_res['validation_passed'] else 'FAILED'}")
+
+    cli_alert_success("Automata learning converged successfully!")
+    spec_table = [
+        ["Model UUID", model_id],
+        ["Target Identifier", target_name],
+        ["Learned States |Q|", str(len(pdfa.states))],
+        ["Transitions |δ|", str(len(pdfa.delta))],
+        ["Alphabet Size |Σ|", f"{len(pdfa.alphabet)} symbols"],
+        ["Validation Status", status_pill("CANDIDATE") if val_res["validation_passed"] else status_pill("REJECTED")],
+    ]
+    cli_table(["Property", "Specification"], spec_table)
     return 0
 
 
 def cmd_validate(model_id: str, db_path: str) -> int:
     repo = ModelRepository(db_path)
     res = repo.validate_model(model_id)
-    print(f"Validation results for model {model_id}:")
-    print(json.dumps(res, indent=2))
-    return 0 if res["validation_passed"] else 1
+
+    cli_h2(f"Model Validation Check: {model_id}")
+    rows = [
+        ["Overall Validation", "✔ PASSED" if res.get("validation_passed") else "✖ FAILED"],
+        ["Stochastic Validity", "✔ VALID" if res.get("stochastic_validity") else "✖ INVALID"],
+        ["Connectedness", "✔ CONNECTED" if res.get("connectedness") else "✖ UNCONNECTED"],
+        ["Model Status", status_pill(res.get("status", "UNKNOWN"))],
+    ]
+    cli_table(["Check", "Result"], rows)
+
+    if res.get("validation_passed"):
+        cli_alert_success(f"Model '{model_id}' passed all validation invariants.")
+        return 0
+    else:
+        cli_alert_danger(f"Model '{model_id}' failed validation checks.")
+        return 1
 
 
 def cmd_verify(parsed: argparse.Namespace) -> int:
@@ -279,7 +349,7 @@ def cmd_verify(parsed: argparse.Namespace) -> int:
 
     events = store.get_trace(parsed.trace_id)
     if not events:
-        print(f"No events found for trace_id '{parsed.trace_id}'", file=sys.stderr)
+        cli_alert_danger(f"No events found for trace_id '{parsed.trace_id}'")
         return 1
 
     agent_id = events[0].agent_id
@@ -289,13 +359,12 @@ def cmd_verify(parsed: argparse.Namespace) -> int:
     else:
         model_dict = repo.get_active_model(agent_id)
         if not model_dict:
-            # Fallback to latest candidate
             models = repo.list_models(agent_id=agent_id)
             if models:
                 model_dict = models[0]
 
     if not model_dict:
-        print(f"No model found for agent '{agent_id}'", file=sys.stderr)
+        cli_alert_danger(f"No active or candidate model found for agent '{agent_id}'")
         return 1
 
     pdfa = model_dict["pdfa"]
@@ -322,25 +391,38 @@ def cmd_verify(parsed: argparse.Namespace) -> int:
         if r.violation is not None or "missing_child_trace" in r.classification
     ]
 
-    print(f"Verification Results for Trace {parsed.trace_id}:")
-    print(f"  Events Evaluated: {len(responses)}")
-    print(f"  Violations Found: {len(violations)}")
-    print(f"  Mean NLL:         {responses[-1].running_mean_nll if responses else 0.0:.3f}")
+    cli_h2(f"Runtime Verification: Trace {parsed.trace_id}")
+    cli_kv("Agent Target", agent_id)
+    cli_kv("Model Version", f"v{model_dict['model_version']}")
+    cli_kv("Policy File", parsed.policy or "None (Behavioral protocol only)")
+    cli_kv("Enforcement Mode", parsed.mode.upper())
+
+    mean_nll = responses[-1].running_mean_nll if responses else 0.0
+    summary_rows = [
+        ["Events Evaluated", str(len(responses))],
+        ["Violations Detected", str(len(violations))],
+        ["Final Running NLL", f"{mean_nll:.4f}"],
+    ]
+    cli_table(["Verification Metric", "Result"], summary_rows)
 
     if violations:
-        print("\nViolations Summary:")
+        cli_alert_danger(f"Verification FAILED: Detected {len(violations)} non-conforming event(s)!")
+        viol_rows = []
         for v in violations:
             expl = v.violation
             if expl:
-                print(f"  - Event: {expl.event_id} | Classifications: {v.classification}")
-                print(f"    Observed: {expl.observed_symbol} | Expected at {expl.previous_known_good_state.state_id}: {expl.expected_symbols_at_state}")
-                if expl.delegation_context.depth > 0 or expl.delegation_context.role:
-                    print(f"    Delegation: depth={expl.delegation_context.depth}, role='{expl.delegation_context.role}', parent_span='{expl.delegation_context.parent_span_id}'")
-                if expl.policy_rule_if_applicable:
-                    print(f"    Policy Rule Broken: {expl.policy_rule_if_applicable}")
+                viol_rows.append([
+                    str(expl.event_id)[:16],
+                    expl.observed_symbol,
+                    ", ".join(expl.expected_symbols_at_state[:3]),
+                    expl.policy_rule_if_applicable or "Structural/Probabilistic",
+                ])
             else:
-                print(f"  - Event: {v.event_id} | Classifications: {v.classification}")
+                viol_rows.append([str(v.event_id)[:16], "N/A", "N/A", ", ".join(v.classification)])
+        cli_table(["Event ID", "Observed", "Expected at State", "Policy / Reason"], viol_rows)
         return 1
+
+    cli_alert_success(f"Verification PASSED: Trace '{parsed.trace_id}' strictly conforms to protocol & policy.")
     return 0
 
 
@@ -348,48 +430,68 @@ def cmd_replay(trace_id: str, db_path: str) -> int:
     store = TraceStore(db_path)
     events = store.get_trace(trace_id)
     if not events:
-        print(f"No events found for trace '{trace_id}'", file=sys.stderr)
+        cli_alert_danger(f"No events found for trace '{trace_id}'")
         return 1
 
-    print(f"Replaying trace {trace_id} ({len(events)} events):")
+    cli_h2(f"Trace Trajectory Replay: {trace_id}")
+    cli_kv("Total Events", len(events))
+    cli_kv("Agent Target", events[0].agent_id if events else "N/A")
+
+    rows = []
     for ev in events:
-        print(f"  [{ev.sequence_no:02d}] {ev.event_type:<12} | {ev.symbol:<20} (native: {ev.raw_symbol})")
+        rows.append([f"{ev.sequence_no:02d}", ev.event_type, ev.symbol, ev.raw_symbol])
+    cli_table(["Seq", "Event Type", "Canonical Symbol", "Raw Symbol"], rows)
+    cli_alert_info(f"Replayed {len(events)} events successfully.")
     return 0
 
 
 def cmd_policy_validate(file_path: str) -> int:
     path = Path(file_path)
     if not path.exists():
-        print(f"File not found: {path}", file=sys.stderr)
+        cli_alert_danger(f"Policy file not found: {path}")
         return 1
 
+    cli_h2(f"Validating Policy DSL: {path.name}")
     content = path.read_text(encoding="utf-8")
     try:
         ast = PolicyParser.parse(content)
         dfa = PolicyCompiler.compile(ast)
-        print(f"Policy '{ast.name}' compiled successfully!")
-        print(f"  Rules count:      {len(ast.rules)}")
-        print(f"  DFA States:       {len(dfa.states)}")
-        print(f"  Accepting States: {len(dfa.accepting_states)}")
-        print(f"  Transitions:      {len(dfa.delta)}")
+        cli_alert_success(f"Policy '{ast.name}' compiled to deterministic finite automaton (DFA)!")
+        cli_table(["Automaton Property", "Specification"], [
+            ["Policy Name", ast.name],
+            ["Rules Declared", str(len(ast.rules))],
+            ["DFA States |Q|", str(len(dfa.states))],
+            ["Accepting States |F|", str(len(dfa.accepting_states))],
+            ["Transitions |δ|", str(len(dfa.delta))],
+        ])
         return 0
     except Exception as e:
-        print(f"Policy validation failed: {e}", file=sys.stderr)
+        cli_alert_danger(f"Policy validation failed: {e}")
         return 1
 
 
 def cmd_model_list(agent_id: Optional[str], db_path: str) -> int:
     repo = ModelRepository(db_path)
     models = repo.list_models(agent_id=agent_id)
+    cli_h2("Automata Model Repository")
+    if agent_id:
+        cli_kv("Filtered Agent", agent_id)
     if not models:
-        print("No models found.")
+        cli_alert_info("No models found in repository.")
         return 0
 
-    print(f"{'Model ID':<38} | {'Agent':<15} | {'Ver':<4} | {'Status':<12} | {'States':<6}")
-    print("-" * 85)
+    rows = []
     for m in models:
         st_cnt = len(m["pdfa"].states)
-        print(f"{m['model_id']:<38} | {m['agent_id']:<15} | {m['model_version']:<4} | {m['status']:<12} | {st_cnt:<6}")
+        rows.append([
+            m["model_id"],
+            m["agent_id"],
+            f"v{m['model_version']}",
+            status_pill(m["status"]),
+            str(st_cnt),
+            str(len(m["pdfa"].alphabet)),
+        ])
+    cli_table(["Model UUID", "Agent Target", "Ver", "Status", "States", "Alphabet"], rows)
     return 0
 
 
@@ -397,29 +499,38 @@ def cmd_model_inspect(model_id: str, db_path: str) -> int:
     repo = ModelRepository(db_path)
     m = repo.get_model(model_id)
     if not m:
-        print(f"Model '{model_id}' not found.", file=sys.stderr)
+        cli_alert_danger(f"Model '{model_id}' not found.")
         return 1
 
     pdfa = m["pdfa"]
-    print(f"Model ID:      {m['model_id']}")
-    print(f"Agent ID:      {m['agent_id']}")
-    print(f"Version:       v{m['model_version']}")
-    print(f"Status:        {m['status']}")
-    print(f"States:        {len(pdfa.states)}")
-    print(f"Alphabet:      {sorted(list(pdfa.alphabet))}")
-    print("\nState Machine Transitions:")
+    cli_h2(f"Model Inspection: {model_id}")
+    cli_kv("Model UUID", m["model_id"])
+    cli_kv("Agent Target", m["agent_id"])
+    cli_kv("Version", f"v{m['model_version']}")
+    cli_kv("Status", status_pill(m["status"]))
+    cli_kv("Learned States", len(pdfa.states))
+    cli_kv("Alphabet Size", len(pdfa.alphabet))
+    cli_kv("Alphabet", ", ".join(sorted(list(pdfa.alphabet))))
+
+    cli_h3("State Machine Transitions (δ, P, n)")
+    rows = []
     for (s, sym), tgt in sorted(pdfa.delta.items(), key=lambda x: (x[0][0], x[0][1])):
         prob = pdfa.P.get((s, sym), 0.0)
         cnt = pdfa.counts.get((s, sym), 0)
-        print(f"  {s} --[{sym} (P={prob:.2f}, n={cnt})]--> {tgt}")
+        rows.append([s, sym, f"{prob:.3f}", str(cnt), tgt])
+    cli_table(["Source State", "Event Symbol", "Probability (P)", "Count (n)", "Target State"], rows)
     return 0
 
 
 def cmd_adapter_list() -> int:
+    cli_h2("Registered Framework Adapters")
     adapters = list_adapters()
-    print("Registered Framework Adapters:")
-    for a in adapters:
-        print(f"  Framework: {a['framework']:<18} | Adapter Ver: {a['adapter_version']:<6} | Supported Schemas: {', '.join(a['supported_framework_schema_versions'])}")
+    rows = [
+        [a["framework"], f"v{a['adapter_version']}", ", ".join(a["supported_framework_schema_versions"]), "✔ Active"]
+        for a in adapters
+    ]
+    cli_table(["Framework", "Adapter Ver", "Supported Schemas", "Status"], rows)
+    cli_alert_info(f"Total of {len(adapters)} framework adapters active.")
     return 0
 
 
@@ -427,15 +538,16 @@ def cmd_model_promote(model_id: str, activate: bool, db_path: str) -> int:
     from trace.feedback.engine import FeedbackEngine
     repo = ModelRepository(db_path)
     engine = FeedbackEngine(model_repo=repo)
+    cli_h2(f"Model Promotion: {model_id}")
     try:
         res = engine.review_candidate_model(model_id, action="approve", reviewer="cli-operator")
-        print(f"Model '{model_id}' promoted to status: {res['status']}")
+        cli_alert_success(f"Model promoted to status: {status_pill(res['status'])}")
         if activate:
             act_res = engine.activate_promoted_model(model_id)
-            print(f"Model '{model_id}' activated into production: {act_res['status']}")
+            cli_alert_success(f"Model activated into production: {status_pill(act_res['status'])}")
         return 0
     except Exception as e:
-        print(f"Error promoting model '{model_id}': {e}", file=sys.stderr)
+        cli_alert_danger(f"Error promoting model '{model_id}': {e}")
         return 1
 
 
@@ -443,18 +555,21 @@ def cmd_feedback_record(violation_id: str, feedback_type: str, reviewer: str, co
     from trace.feedback.engine import FeedbackEngine, RelationalFeedbackStore
     store = RelationalFeedbackStore(f"sqlite:///{db_path}")
     engine = FeedbackEngine(store=store)
+    cli_h2("Recording Human-in-the-Loop Feedback")
     record = engine.record_feedback(
         violation_id=violation_id,
         feedback_type=feedback_type,  # type: ignore
         reviewer=reviewer,
         comment=comment,
     )
-    print(f"Recorded feedback ID: {record.feedback_id}")
-    print(f"  Violation ID:  {record.violation_id}")
-    print(f"  Type:          {record.feedback_type}")
-    print(f"  Reviewer:      {record.reviewer}")
-    if record.comment:
-        print(f"  Comment:       {record.comment}")
+    cli_alert_success(f"Feedback recorded successfully.")
+    cli_table(["Field", "Value"], [
+        ["Feedback UUID", record.feedback_id],
+        ["Violation UUID", record.violation_id],
+        ["Feedback Type", record.feedback_type],
+        ["Reviewer", record.reviewer],
+        ["Comment", record.comment or "None"],
+    ])
     return 0
 
 
@@ -463,60 +578,101 @@ def cmd_feedback_list(db_path: str) -> int:
     store = RelationalFeedbackStore(f"sqlite:///{db_path}")
     engine = FeedbackEngine(store=store)
     records = engine.list_feedback()
+    cli_h2("Human-in-the-Loop Feedback Registry")
     if not records:
-        print("No feedback records found.")
+        cli_alert_info("No feedback records registered.")
         return 0
 
-    print(f"{'Feedback ID':<38} | {'Violation ID':<38} | {'Type':<12} | {'Reviewer':<15} | {'Applied':<7}")
-    print("-" * 125)
+    rows = []
     for r in records:
-        print(f"{r.feedback_id:<38} | {r.violation_id:<38} | {r.feedback_type:<12} | {r.reviewer:<15} | {str(r.applied):<7}")
+        rows.append([
+            r.feedback_id[:16] + "...",
+            r.violation_id[:16] + "...",
+            r.feedback_type,
+            r.reviewer,
+            "✔ Yes" if r.applied else "Pending",
+        ])
+    cli_table(["Feedback UUID", "Violation UUID", "Type", "Reviewer", "Applied"], rows)
     return 0
 
 
 def cmd_benchmark_run(rq: str) -> int:
     from trace.benchmarks.evaluator import BenchmarkSuite
-    print(f"Starting TRACE Benchmark Suite (evaluating: {rq})...")
+    cli_h2(f"TRACE Empirical Benchmark Suite (Evaluating: RQ{rq.upper()})")
     suite = BenchmarkSuite()
 
     if rq == "all":
         summary = suite.run_all()
+        cli_alert_success("Evaluation of RQ1–RQ6 completed successfully.")
         print("\n" + summary.render_markdown())
     elif rq == "1":
         res1 = suite.run_rq1()
-        print(f"\nRQ1 Sample Complexity:\n  Sizes: {res1.sample_sizes}\n  States: {res1.state_counts}\n  Transitions: {res1.transition_counts}")
+        cli_alert_success("RQ1 Sample Complexity Evaluation Completed.")
+        cli_table(["Sample Size (Traces)", "Learned States |Q|", "Transitions |δ|"], [
+            [str(s), str(st), str(tr)]
+            for s, st, tr in zip(res1.sample_sizes, res1.state_counts, res1.transition_counts)
+        ])
     elif rq == "2":
         res2 = suite.run_rq2()
-        print(f"\nRQ2 Anomaly Detection:\n  Precision: {res2.precision:.4f}\n  Recall: {res2.recall:.4f}\n  F1: {res2.f1:.4f}")
+        cli_alert_success("RQ2 Anomaly Detection Evaluation Completed.")
+        cli_table(["Metric", "Value"], [
+            ["Precision", f"{res2.precision:.4f}"],
+            ["Recall", f"{res2.recall:.4f}"],
+            ["F1-Score", f"{res2.f1:.4f}"],
+        ])
     elif rq == "3":
         res3 = suite.run_rq3()
-        print(f"\nRQ3 Latency Overhead:\n  Mean: {res3.mean_latency_ms:.4f}ms\n  p99: {res3.p99_latency_ms:.4f}ms\n  Budget Met (<5ms): {res3.budget_met}")
+        cli_alert_success("RQ3 Latency Overhead Evaluation Completed.")
+        cli_table(["Metric", "Value"], [
+            ["Mean Latency", f"{res3.mean_latency_ms:.4f} ms"],
+            ["p99 Latency", f"{res3.p99_latency_ms:.4f} ms"],
+            ["Budget Met (< 5.0ms)", "✔ YES" if res3.budget_met else "✖ NO"],
+        ])
     elif rq == "4":
         res4 = suite.run_rq4()
-        print(f"\nRQ4 Policy Enforcement:\n  Accuracy: {res4.policy_enforcement_accuracy:.4f}\n  Violations Caught: {res4.violations_caught}")
+        cli_alert_success("RQ4 Policy Enforcement Evaluation Completed.")
+        cli_table(["Metric", "Value"], [
+            ["Policy Enforcement Accuracy", f"{res4.policy_enforcement_accuracy:.4f}"],
+            ["Violations Caught", str(res4.violations_caught)],
+        ])
     elif rq == "5":
         res5 = suite.run_rq5()
-        print(f"\nRQ5 Drift Detection:\n  Detected: {res5.drift_detected}\n  KS Statistic: {res5.ks_statistic:.4f}\n  p-value: {res5.p_value:.6f}")
+        cli_alert_success("RQ5 Concept Drift Detection Evaluation Completed.")
+        cli_table(["Metric", "Value"], [
+            ["Drift Detected", "✔ YES" if res5.drift_detected else "✖ NO"],
+            ["KS Statistic", f"{res5.ks_statistic:.4f}"],
+            ["p-value", f"{res5.p_value:.6e}"],
+        ])
     elif rq == "6":
         res6 = suite.run_rq6()
-        print(f"\nRQ6 Hierarchical State Reduction:\n  Flat: {res6.flat_states_count}\n  Hierarchical: {res6.hierarchical_states_count}\n  Reduction: {res6.reduction_percentage:.2f}%")
+        cli_alert_success("RQ6 Hierarchical State Reduction Completed.")
+        cli_table(["Metric", "Value"], [
+            ["Flat Monolithic States", str(res6.flat_states_count)],
+            ["Hierarchical Modular States", str(res6.hierarchical_states_count)],
+            ["State Space Reduction", f"{res6.reduction_percentage:.2f}%"],
+        ])
 
     return 0
 
 
 def cmd_ingest_benchmark(path_str: str, dataset: str, db_path: str, train: bool) -> int:
+    cli_h2("Benchmark Trajectory Ingestion")
+    cli_kv("Dataset Mode", dataset)
+    cli_kv("Source Path", path_str)
+    cli_kv("Target DB", db_path)
+
     store = TraceStore(db_path)
     pipeline = IngestionPipeline(trace_store=store)
     path = Path(path_str)
 
     if not path.exists():
-        print(f"Error: Path '{path_str}' does not exist.", file=sys.stderr)
+        cli_alert_danger(f"Error: Path '{path_str}' does not exist.")
         return 1
 
     files_to_process = [path] if path.is_file() else sorted(list(path.glob("*.json")) + list(path.glob("*.jsonl")))
 
     if not files_to_process:
-        print(f"Error: No JSON/JSONL files found in '{path_str}'.", file=sys.stderr)
+        cli_alert_danger(f"Error: No JSON/JSONL files found in '{path_str}'.")
         return 1
 
     total_accepted = 0
@@ -524,7 +680,7 @@ def cmd_ingest_benchmark(path_str: str, dataset: str, db_path: str, train: bool)
     total_rejected = 0
     framework_hint = None if dataset == "auto" else dataset
 
-    print(f"Ingesting {len(files_to_process)} benchmark trajectory file(s) [format: {dataset}] into {db_path}...")
+    cli_alert_info(f"Ingesting {len(files_to_process)} benchmark file(s)...")
 
     agents_seen = set()
     for f in files_to_process:
@@ -536,17 +692,19 @@ def cmd_ingest_benchmark(path_str: str, dataset: str, db_path: str, train: bool)
             for rec in res.accepted:
                 agents_seen.add(rec.agent_id)
         except Exception as e:
-            print(f"Warning: Failed to ingest {f.name}: {e}", file=sys.stderr)
+            cli_alert_warning(f"Failed to ingest {f.name}: {e}")
 
-    print(f"\nBenchmark Ingestion Summary:")
-    print(f"  Files Processed: {len(files_to_process)}")
-    print(f"  Accepted Events: {total_accepted}")
-    print(f"  Duplicates:      {total_duplicates}")
-    print(f"  Rejected Events: {total_rejected}")
-    print(f"  Agents Ingested: {sorted(list(agents_seen)) if agents_seen else 'None'}")
+    summary_rows = [
+        ["Files Processed", str(len(files_to_process))],
+        ["Accepted CES Events", str(total_accepted)],
+        ["Duplicate Events", str(total_duplicates)],
+        ["Rejected Events", str(total_rejected)],
+        ["Agents Discovered", ", ".join(sorted(agents_seen)) if agents_seen else "None"],
+    ]
+    cli_table(["Benchmark Metric", "Result"], summary_rows)
 
     if train and agents_seen:
-        print("\nInitiating automated PDFA protocol inference on ingested benchmark traces...")
+        cli_h3("Automated Protocol Model Inference (ALERGIA Engine)")
         repo = ModelRepository(db_path)
         for agent_id in sorted(list(agents_seen)):
             corpus = store.get_corpus(agent_id)
@@ -563,11 +721,10 @@ def cmd_ingest_benchmark(path_str: str, dataset: str, db_path: str, train: bool)
             )
             repo.validate_model(model_id)
             repo.promote_model(model_id, approver="benchmark-ingest")
-            print(f"  ✓ Inferred and activated PDFA for '{agent_id}': Model UUID {model_id} ({len(pdfa.states)} states, {len(pdfa.alphabet)} symbols)")
+            cli_alert_success(f"Synthesized PDFA for '{agent_id}': Model UUID {model_id} ({len(pdfa.states)} states, {len(pdfa.alphabet)} symbols)")
 
     return 0 if (total_accepted > 0 or total_duplicates > 0) else 1
 
 
 if __name__ == "__main__":
     sys.exit(main())
-
