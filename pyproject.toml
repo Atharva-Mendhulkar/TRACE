@@ -29,7 +29,11 @@ dev = [
 ]
 
 [project.scripts]
-trace = "trace.cli.main:main"
+trace = "trace_entrypoint:main"
+trace-runtime = "trace_entrypoint:main"
+
+[tool.setuptools]
+py-modules = ["trace_entrypoint"]
 
 [tool.setuptools.packages.find]
 where = ["."]
