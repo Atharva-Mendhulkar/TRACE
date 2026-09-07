@@ -1,0 +1,185 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "trace_id": "trace-research-001",
+    "agent_id": "research-agent",
+    "method": "tools/call",
+    "params": {
+      "name": "web_search",
+      "arguments": {
+        "query": "probabilistic automata learning algorithms"
+      }
+    },
+    "sequence_no": 0
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "trace_id": "trace-research-001",
+    "agent_id": "research-agent",
+    "tool_name": "web_search",
+    "result": {
+      "content": [{"type": "text", "text": "Found ALERGIA, MDI, and EDSM papers."}]
+    },
+    "sequence_no": 1
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "trace_id": "trace-research-001",
+    "agent_id": "research-agent",
+    "method": "tools/call",
+    "params": {
+      "name": "read_content",
+      "arguments": {
+        "url": "https://arxiv.org/abs/alergia-1994"
+      }
+    },
+    "sequence_no": 2
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "trace_id": "trace-research-001",
+    "agent_id": "research-agent",
+    "tool_name": "read_content",
+    "result": {
+      "content": [{"type": "text", "text": "Paper contents loaded."}]
+    },
+    "sequence_no": 3
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "trace_id": "trace-research-001",
+    "agent_id": "research-agent",
+    "method": "tools/call",
+    "params": {
+      "name": "summarize",
+      "arguments": {
+        "topic": "ALERGIA algorithm"
+      }
+    },
+    "sequence_no": 4
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 4,
+    "trace_id": "trace-research-001",
+    "agent_id": "research-agent",
+    "event_type": "terminate",
+    "symbol": "terminate",
+    "sequence_no": 5
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "trace_id": "trace-research-002",
+    "agent_id": "research-agent",
+    "method": "tools/call",
+    "params": {
+      "name": "web_search",
+      "arguments": {
+        "query": "runtime verification for LLMs"
+      }
+    },
+    "sequence_no": 0
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "trace_id": "trace-research-002",
+    "agent_id": "research-agent",
+    "tool_name": "web_search",
+    "result": {
+      "content": [{"type": "text", "text": "Found product automaton monitoring."}]
+    },
+    "sequence_no": 1
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "trace_id": "trace-research-002",
+    "agent_id": "research-agent",
+    "method": "tools/call",
+    "params": {
+      "name": "read_content",
+      "arguments": {
+        "url": "https://arxiv.org/abs/runtime-monitoring"
+      }
+    },
+    "sequence_no": 2
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "trace_id": "trace-research-002",
+    "agent_id": "research-agent",
+    "method": "tools/call",
+    "params": {
+      "name": "summarize",
+      "arguments": {
+        "topic": "Dual control runtime verification"
+      }
+    },
+    "sequence_no": 3
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 4,
+    "trace_id": "trace-research-002",
+    "agent_id": "research-agent",
+    "event_type": "terminate",
+    "symbol": "terminate",
+    "sequence_no": 4
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "trace_id": "trace-security-001",
+    "agent_id": "security-agent",
+    "method": "tools/call",
+    "params": {
+      "name": "auth_check",
+      "arguments": {
+        "role": "admin"
+      }
+    },
+    "sequence_no": 0
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "trace_id": "trace-security-001",
+    "agent_id": "security-agent",
+    "tool_name": "auth_check",
+    "result": {
+      "authorized": true
+    },
+    "sequence_no": 1
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "trace_id": "trace-security-001",
+    "agent_id": "security-agent",
+    "method": "tools/call",
+    "params": {
+      "name": "scan_network",
+      "arguments": {
+        "target_subnet": "10.0.1.0/24"
+      }
+    },
+    "sequence_no": 2
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "trace_id": "trace-security-001",
+    "agent_id": "security-agent",
+    "event_type": "terminate",
+    "symbol": "terminate",
+    "sequence_no": 3
+  }
+]

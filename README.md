@@ -1,10 +1,53 @@
-# TRACE: Trace-based Runtime Automata for Compliance and Enforcement
+<a id="readme-top"></a>
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org/)
-[![CI Status](https://img.shields.io/badge/CI-passing-emerald.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-50%2F50%20passing-success.svg)](trace/tests/)
-[![Latency](https://img.shields.io/badge/verification%20p99-0.021%20ms-indigo.svg)](#rq3-verification-latency)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<!-- PROJECT SHIELDS -->
+<div align="center">
+
+[![CI Quality Gates](https://github.com/Atharva-Mendhulkar/TRACE/actions/workflows/ci.yml/badge.svg)](https://github.com/Atharva-Mendhulkar/TRACE/actions/workflows/ci.yml)
+[![Tests Passing](https://img.shields.io/badge/Tests-58%2F58%20Passing%20(100%25)-success?style=flat-square&logo=pytest)](trace/tests/)
+[![Python Matrix](https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue?style=flat-square&logo=python)](https://www.python.org/)
+[![Verification Latency](https://img.shields.io/badge/Latency%20p99-%3C0.03ms%20(budget%20%3C5ms)-indigo?style=flat-square)](#rq3-verification-latency)
+[![Framework Adapters](https://img.shields.io/badge/Framework%20Adapters-9%20Active-brightgreen?style=flat-square)](#all-9-framework--benchmark-adapters)
+[![Docker & Compose](https://img.shields.io/badge/Docker-Postgres%20%7C%20Redis%20%7C%20API-blue?style=flat-square&logo=docker)](docker-compose.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+
+</div>
+
+<!-- PROJECT LOGO -->
+<br />
+<div align="center">
+  <pre>
+  ╱$$                                           
+ │ $$                                           
+╱$$$$$$    ╱$$$$$$  ╱$$$$$$   ╱$$$$$$$  ╱$$$$$$ 
+│_  $$_╱   ╱$$__  $$│____  $$ ╱$$_____╱ ╱$$__  $$
+  │ $$    │ $$  ╲__╱ ╱$$$$$$$│ $$      │ $$$$$$$$
+  │ $$ ╱$$│ $$      ╱$$__  $$│ $$      │ $$_____╱
+  │  $$$$╱│ $$     │  $$$$$$$│  $$$$$$$│  $$$$$$$
+   ╲___╱  │__╱      ╲_______╱ ╲_______╱ ╲_______╱
+  </pre>
+
+  <h1 align="center">TRACE</h1>
+
+  <p align="center">
+    <strong>Trace-based Runtime Automata for Compliance and Enforcement</strong>
+    <br />
+    Formal Behavioral Inference &middot; Temporal Policy Verification &middot; Heterogeneous AI Agent Safety
+    <br />
+    <br />
+    <a href="#architecture-overview"><strong>Explore Architecture »</strong></a>
+    &middot;
+    <a href="#quickstart"><strong>Quickstart Guide »</strong></a>
+    &middot;
+    <a href="#cli-reference--mock-data-test-suite"><strong>CLI & Mock Data »</strong></a>
+    &middot;
+    <a href="#empirical-benchmark-findings-rq1rq6"><strong>Empirical Benchmarks (RQ1–RQ6) »</strong></a>
+    &middot;
+    <a href="https://github.com/Atharva-Mendhulkar/TRACE/issues">Report an Issue</a>
+  </p>
+</div>
+
+---
 
 **TRACE** is an open-source, research-grade system for inferring, verifying, and monitoring the behavioral protocols of heterogeneous AI agent systems in real time. 
 
@@ -190,71 +233,116 @@ docker compose up --build -d
 
 ---
 
-## CLI Reference
+## CLI Reference & Mock Data Test Suite
 
-### 1. Adapter Management
+TRACE provides an interactive, Posit/R-`cli`-inspired semantic command-line interface featuring colored banners, styled alert badges (`✔`, `ℹ`, `▲`, `✖`), formatted Unicode tables, and inspection views.
+
+### Mock Dataset (`mock_data/`)
+
+The repository includes a self-contained mock dataset in [`mock_data/`](mock_data/) to test and verify every CLI capability:
+
+| File | Format / Framework | Description |
+|---|---|---|
+| [`mock_data/events.json`](mock_data/events.json) | MCP JSON-RPC 2.0 | Multi-agent execution traces (`research-agent`, `security-agent`) |
+| [`mock_data/benchmark_trajectories.json`](mock_data/benchmark_trajectories.json) | SWE-bench Format | Benchmark trajectories (`search_code` $\to$ `read_file` $\to$ `edit_file` $\to$ `run_test` $\to$ `submit`) |
+| [`mock_data/compliance_policy.policy`](mock_data/compliance_policy.policy) | TRACE Policy DSL | Declarative temporal safety rules (`REQUIRE`, `FORBID SEQUENCE`, `LIMIT`) |
+| [`mock_data/anomalous_events.json`](mock_data/anomalous_events.json) | MCP JSON-RPC 2.0 | Policy violation trace (`scan_network` without prior `auth_check`) |
+| [`mock_data/test_cli.sh`](mock_data/test_cli.sh) | Bash Script | **Automated test script executing all 19 CLI operations end-to-end** |
+
+### One-Line Complete CLI Test
+Execute the comprehensive end-to-end test suite against the mock dataset:
 ```bash
-# List all 7 registered framework adapters
+bash mock_data/test_cli.sh
+```
+
+---
+
+### Step-by-Step CLI Commands
+
+#### 1. Adapter Registry
+```bash
+# List all 9 registered framework & benchmark adapters
 trace adapter list
 ```
 
-### 2. Ingestion
+#### 2. Policy DSL Validation & Compilation
 ```bash
-# Ingest framework trace logs into SQLite/Postgres
-trace ingest trace/tests/fixtures/mcp_normal.json --db trace.sqlite
-trace ingest trace/tests/fixtures/langgraph_normal.json --db trace.sqlite
+# Parse and compile declarative safety rules to a DFA
+trace policy validate mock_data/compliance_policy.policy
 ```
 
-### 3. Automata Learning
+#### 3. Ingestion into Storage
 ```bash
-# Infer PDFA using ALERGIA state merging
-trace train --agent-id mcp-researcher --heuristic alergia --alpha 0.05 --db trace.sqlite
+# Ingest normal framework events into SQLite/Postgres
+trace ingest mock_data/events.json --framework mcp --db trace.sqlite
+
+# Ingest anomalous traces for violation testing
+trace ingest mock_data/anomalous_events.json --framework mcp --db trace.sqlite
 ```
 
-### 4. Model Lifecycle & Promotion
+#### 4. Real-World Benchmark Trajectory Ingestion & Auto-Training
 ```bash
-# List models and inspect transitions
+# Ingest SWE-bench software engineering traces and immediately infer a PDFA
+trace ingest-benchmark mock_data/benchmark_trajectories.json --dataset swebench --db trace.sqlite --train
+```
+
+#### 5. Automata Learning (ALERGIA / MDI / EDSM)
+```bash
+# Infer PDFA protocol model for research-agent
+trace train --agent-id research-agent --engine native-alergia --heuristic alergia --alpha 0.05 --db trace.sqlite
+
+# Infer PDFA protocol model for security-agent
+trace train --agent-id security-agent --engine native-alergia --heuristic alergia --alpha 0.05 --db trace.sqlite
+```
+
+#### 6. Model Lifecycle & State Machine Inspection
+```bash
+# List all candidate and active models
 trace model list --db trace.sqlite
-trace model inspect <MODEL_ID> --db trace.sqlite
+
+# Inspect learned state machine transitions, counts, and probabilities (δ, P, n)
+trace model inspect <MODEL_UUID> --db trace.sqlite
+
+# Validate stochastic and structural invariants
+trace validate --model-id <MODEL_UUID> --db trace.sqlite
 
 # Promote candidate model to active production
-trace model promote <MODEL_ID> --activate --db trace.sqlite
+trace model promote <MODEL_UUID> --activate --db trace.sqlite
 ```
 
-### 5. Policy DSL Validation & Compilation
+#### 7. Trace Trajectory Replay & Streaming Verification
 ```bash
-trace policy validate trace/tests/fixtures/sample.policy
+# Replay stored execution trajectory
+trace replay --trace-id trace-research-001 --db trace.sqlite
+
+# Verify conforming trace against active PDFA model (PASSED verdict)
+trace verify --trace-id trace-research-001 --db trace.sqlite
+
+# Verify anomalous trace against safety policy (FAILED with violation diff)
+trace verify --trace-id trace-violation-001 --policy mock_data/compliance_policy.policy --db trace.sqlite
 ```
 
-### 6. Streaming / Replay Verification
+#### 8. Human-in-the-Loop (HITL) Violation Triage
 ```bash
-trace verify --trace-id <TRACE_ID> --policy trace/tests/fixtures/sample.policy --db trace.sqlite
-trace replay --trace-id <TRACE_ID> --db trace.sqlite
+# Record reviewer audit decision for a runtime violation
+trace feedback record \
+  --violation-id viol-001 \
+  --type approve \
+  --reviewer secops-lead \
+  --comment "Authorized security audit exception" \
+  --db trace.sqlite
+
+# List recorded feedback triage records
+trace feedback list --db trace.sqlite
 ```
 
-### 7. Human-in-the-Loop Feedback
+#### 9. Empirical Evaluation Benchmarks (RQ1–RQ6)
 ```bash
-# Record review decision for a runtime violation
-trace feedback record --violation-id viol-01 --type approve --reviewer sec-admin --comment "Valid novelty"
+# Run single RQ evaluation (e.g. RQ3 Latency Overhead)
+trace benchmark run --rq 3
 
-# List recorded triage feedback
-trace feedback list
-```
-
-### 8. Benchmark Suite
-```bash
-# Run all benchmark evaluations (RQ1 - RQ6)
+# Run all empirical evaluations (RQ1 through RQ6)
 trace benchmark run --rq all
-```
-
-### 9. Real-World Benchmark Trajectory Ingestion
-Ingest SWE-bench or OSWorld execution traces and automatically infer PDFA protocol models:
-```bash
-# Ingest SWE-bench software engineering trajectory and train PDFA
-trace ingest-benchmark trace/tests/fixtures/swebench_normal.json --dataset swebench --db trace.sqlite --train
-
-# Ingest OSWorld multimodal desktop agent traces
-trace ingest-benchmark trace/tests/fixtures/osworld_normal.json --dataset osworld --db trace.sqlite --train
 ```
 
 ---
@@ -283,9 +371,15 @@ trace ingest-benchmark trace/tests/fixtures/osworld_normal.json --dataset osworl
 TRACE/
 ├── .github/
 │   └── workflows/ci.yml       # GitHub Actions multi-python test & docker matrix
+├── mock_data/                 # Self-contained CLI test dataset & automated bash runner
+│   ├── events.json            # Multi-agent MCP framework trace logs
+│   ├── benchmark_trajectories.json # SWE-bench real-world benchmark trajectories
+│   ├── compliance_policy.policy # Declarative safety policy (REQUIRE, FORBID, LIMIT)
+│   ├── anomalous_events.json  # Policy violation traces for verifier triage
+│   └── test_cli.sh            # Complete 19-step automated CLI test script
 ├── trace/
 │   ├── schema/                # CES v1.0 JSON Schema & Pydantic models
-│   ├── adapters/              # 7 Framework adapters (MCP, LangGraph, CrewAI, etc.)
+│   ├── adapters/              # 9 Framework & benchmark adapters (MCP, LangGraph, SWE-bench, etc.)
 │   ├── ingestion/             # Ingestion pipeline, dead-letter routing, dedup
 │   ├── abstraction/           # Agglomerative clustering & taxonomy mapping
 │   ├── corpus/                # Trace repository, windowing, completeness checks
@@ -300,14 +394,12 @@ TRACE/
 │   ├── api/                   # FastAPI gateway, Prometheus metrics, Web Dashboard
 │   ├── streaming/             # Redis Stream and async queue consumers / workers
 │   ├── benchmarks/            # RQ1–RQ6 benchmark evaluation suite and generator
-│   ├── cli/                   # Click CLI interface
-│   └── tests/                 # 45 unit, contract, integration, and benchmark tests
-├── Dockerfile                 # Multi-stage Python 3.11 production container
+│   ├── cli/                   # Semantic CLI interface & Posit/R-cli UI engine
+│   └── tests/                 # 58 unit, contract, integration, and benchmark tests
+├── Dockerfile                 # Multi-stage Python production container
 ├── docker-compose.yml         # Multi-container stack (Postgres+pgvector, Redis, API, Worker)
 ├── pyproject.toml             # Python build configuration and dependencies
-├── prd.md                     # Technical Product Requirements Document
-├── pad.md                     # Principal Architect Document
-└── disclosure.md              # Invention Disclosure & Prior-Art Analysis Report
+└── LICENSE                    # MIT License
 ```
 
 ---
@@ -315,3 +407,5 @@ TRACE/
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>

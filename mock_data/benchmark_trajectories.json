@@ -1,0 +1,52 @@
+{
+  "instance_id": "swebench-django-1001",
+  "agent_id": "swe-agent-gpt4",
+  "history": [
+    {
+      "action": "search_code",
+      "args": {
+        "query": "def get_response(self, request):"
+      },
+      "output": "Found handler in django/core/handlers/base.py",
+      "status": "success",
+      "timestamp": "2026-09-07T10:00:00Z"
+    },
+    {
+      "action": "read_file",
+      "args": {
+        "path": "django/core/handlers/base.py"
+      },
+      "output": "File contents loaded.",
+      "status": "success",
+      "timestamp": "2026-09-07T10:00:10Z"
+    },
+    {
+      "action": "edit_file",
+      "args": {
+        "path": "django/core/handlers/base.py",
+        "patch": "- pass\n+ return response"
+      },
+      "output": "Applied patch successfully.",
+      "status": "success",
+      "timestamp": "2026-09-07T10:00:20Z"
+    },
+    {
+      "action": "run_test",
+      "args": {
+        "command": "pytest tests/handlers/test_base.py"
+      },
+      "output": "12 passed in 0.45s",
+      "status": "success",
+      "timestamp": "2026-09-07T10:00:30Z"
+    },
+    {
+      "action": "submit",
+      "args": {
+        "commit_message": "fix: return correct response"
+      },
+      "output": "Submission confirmed.",
+      "status": "success",
+      "timestamp": "2026-09-07T10:00:40Z"
+    }
+  ]
+}

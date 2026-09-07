@@ -1,0 +1,10 @@
+# TRACE AI Agent Compliance & Safety Policy
+POLICY agent_guardrails
+  REQUIRE auth_check BEFORE scan_network
+  WITHIN 5 EVENTS
+  SCOPE TRACE
+
+  FORBID SEQUENCE [drop_table, delete_all]
+  SCOPE TRACE
+
+  LIMIT run_test TO 5 PER TRACE
