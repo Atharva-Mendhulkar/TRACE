@@ -22,7 +22,9 @@ def test_adapter_registry():
     assert "semantic_kernel" in fws
     assert "google_adk" in fws
     assert "autogen" in fws
-    assert len(fws) == 7
+    assert "swebench" in fws
+    assert "osworld" in fws
+    assert len(fws) == 9
 
 
 def test_mcp_adapter_fixture_contract():

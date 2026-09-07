@@ -1,0 +1,60 @@
+{
+  "task_id": "osworld-calc-042",
+  "agent_id": "osworld-multimodal-agent",
+  "instruction": "Open the calculator, calculate 42 * 10, and report the answer.",
+  "steps": [
+    {
+      "step_idx": 0,
+      "action_type": "app_launch",
+      "action": "launch_application",
+      "parameters": {
+        "app_name": "gnome-calculator"
+      },
+      "status": "success",
+      "timestamp": "2026-09-07T11:00:00Z"
+    },
+    {
+      "step_idx": 1,
+      "action_type": "mouse_click",
+      "action": "click_coordinate",
+      "parameters": {
+        "x": 150,
+        "y": 280,
+        "button": "left"
+      },
+      "status": "success",
+      "timestamp": "2026-09-07T11:00:02Z"
+    },
+    {
+      "step_idx": 2,
+      "action_type": "keyboard_type",
+      "action": "type_text",
+      "parameters": {
+        "text": "42 * 10",
+        "press_enter": true
+      },
+      "status": "success",
+      "timestamp": "2026-09-07T11:00:04Z"
+    },
+    {
+      "step_idx": 3,
+      "action_type": "screenshot",
+      "action": "screen_capture",
+      "parameters": {
+        "region": "window"
+      },
+      "status": "success",
+      "timestamp": "2026-09-07T11:00:06Z"
+    },
+    {
+      "step_idx": 4,
+      "action_type": "terminate",
+      "action": "task_complete",
+      "parameters": {
+        "result_value": 420
+      },
+      "status": "success",
+      "timestamp": "2026-09-07T11:00:08Z"
+    }
+  ]
+}

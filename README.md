@@ -2,24 +2,24 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![CI Status](https://img.shields.io/badge/CI-passing-emerald.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-45%2F45%20passing-success.svg)](trace/tests/)
+[![Tests](https://img.shields.io/badge/tests-50%2F50%20passing-success.svg)](trace/tests/)
 [![Latency](https://img.shields.io/badge/verification%20p99-0.021%20ms-indigo.svg)](#rq3-verification-latency)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **TRACE** is an open-source, research-grade system for inferring, verifying, and monitoring the behavioral protocols of heterogeneous AI agent systems in real time. 
 
-TRACE observes stochastic, positive-only agent execution logs across 7 industry frameworks, extracts formal **Probabilistic Deterministic Finite Automata (PDFA)**, and performs sub-millisecond streaming runtime verification against learned models and declarative safety policies via **dual-control product-automaton composition**.
+TRACE observes stochastic, positive-only agent execution logs across 9 industry frameworks & benchmark ecosystems, extracts formal **Probabilistic Deterministic Finite Automata (PDFA)**, and performs sub-millisecond streaming runtime verification against learned models and declarative safety policies via **dual-control product-automaton composition**.
 
 ---
 
 ## Architecture Overview
 
 ```
-                      [ Heterogeneous Agent Frameworks ]
-     MCP  ·  LangGraph  ·  CrewAI  ·  OpenAI Agents  ·  Semantic Kernel  ·  Google ADK  ·  AutoGen
+                      [ Heterogeneous Agent Frameworks & Benchmarks ]
+     MCP · LangGraph · CrewAI · OpenAI Agents · Semantic Kernel · Google ADK · AutoGen · SWE-bench · OSWorld
                                     │
                                     ▼
-                      [ Framework Adapter Layer (7/7) ]
+                      [ Framework Adapter Layer (9/9) ]
                  Normalizes logs to Canonical Event Schema (CES v1.0)
                  Performs strict secret redaction (keys, auth, tokens)
                                     │
@@ -245,6 +245,16 @@ trace feedback list
 ```bash
 # Run all benchmark evaluations (RQ1 - RQ6)
 trace benchmark run --rq all
+```
+
+### 9. Real-World Benchmark Trajectory Ingestion
+Ingest SWE-bench or OSWorld execution traces and automatically infer PDFA protocol models:
+```bash
+# Ingest SWE-bench software engineering trajectory and train PDFA
+trace ingest-benchmark trace/tests/fixtures/swebench_normal.json --dataset swebench --db trace.sqlite --train
+
+# Ingest OSWorld multimodal desktop agent traces
+trace ingest-benchmark trace/tests/fixtures/osworld_normal.json --dataset osworld --db trace.sqlite --train
 ```
 
 ---

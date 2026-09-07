@@ -38,6 +38,8 @@ FrameworkType = Literal[
     "semantic_kernel",
     "google_adk",
     "autogen",
+    "swebench",
+    "osworld",
     "custom",
 ]
 

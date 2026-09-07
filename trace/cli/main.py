@@ -124,11 +124,33 @@ def main(args: Optional[List[str]] = None) -> int:
         help="Research Question to evaluate",
     )
 
+    # 10. trace ingest-benchmark <path> [--dataset <swebench|osworld|auto>] [--db <db>] [--train]
+    bench_ingest_p = subparsers.add_parser(
+        "ingest-benchmark",
+        help="Ingest real-world benchmark trajectories (SWE-bench / OSWorld) into CES storage",
+    )
+    bench_ingest_p.add_argument("path", help="Path to JSON file or directory containing benchmark trajectories")
+    bench_ingest_p.add_argument(
+        "--dataset",
+        "-d",
+        choices=["swebench", "osworld", "auto"],
+        default="auto",
+        help="Benchmark dataset format (swebench, osworld, or auto-detect)",
+    )
+    bench_ingest_p.add_argument("--db", default=DEFAULT_DB, help="Database file path")
+    bench_ingest_p.add_argument(
+        "--train",
+        action="store_true",
+        help="Automatically train a PDFA protocol model from the ingested traces",
+    )
+
     parsed = parser.parse_args(args)
 
     # Dispatch commands
     if parsed.command == "ingest":
         return cmd_ingest(parsed.path, parsed.framework, parsed.db)
+    elif parsed.command == "ingest-benchmark":
+        return cmd_ingest_benchmark(parsed.path, parsed.dataset, parsed.db, parsed.train)
     elif parsed.command == "train":
         return cmd_train(parsed)
     elif parsed.command == "validate":
@@ -482,5 +504,70 @@ def cmd_benchmark_run(rq: str) -> int:
     return 0
 
 
+def cmd_ingest_benchmark(path_str: str, dataset: str, db_path: str, train: bool) -> int:
+    store = TraceStore(db_path)
+    pipeline = IngestionPipeline(trace_store=store)
+    path = Path(path_str)
+
+    if not path.exists():
+        print(f"Error: Path '{path_str}' does not exist.", file=sys.stderr)
+        return 1
+
+    files_to_process = [path] if path.is_file() else sorted(list(path.glob("*.json")) + list(path.glob("*.jsonl")))
+
+    if not files_to_process:
+        print(f"Error: No JSON/JSONL files found in '{path_str}'.", file=sys.stderr)
+        return 1
+
+    total_accepted = 0
+    total_duplicates = 0
+    total_rejected = 0
+    framework_hint = None if dataset == "auto" else dataset
+
+    print(f"Ingesting {len(files_to_process)} benchmark trajectory file(s) [format: {dataset}] into {db_path}...")
+
+    agents_seen = set()
+    for f in files_to_process:
+        try:
+            res = pipeline.ingest_file(str(f), framework=framework_hint)
+            total_accepted += len(res.accepted)
+            total_duplicates += len(res.duplicates)
+            total_rejected += len(res.rejected)
+            for rec in res.accepted:
+                agents_seen.add(rec.agent_id)
+        except Exception as e:
+            print(f"Warning: Failed to ingest {f.name}: {e}", file=sys.stderr)
+
+    print(f"\nBenchmark Ingestion Summary:")
+    print(f"  Files Processed: {len(files_to_process)}")
+    print(f"  Accepted Events: {total_accepted}")
+    print(f"  Duplicates:      {total_duplicates}")
+    print(f"  Rejected Events: {total_rejected}")
+    print(f"  Agents Ingested: {sorted(list(agents_seen)) if agents_seen else 'None'}")
+
+    if train and agents_seen:
+        print("\nInitiating automated PDFA protocol inference on ingested benchmark traces...")
+        repo = ModelRepository(db_path)
+        for agent_id in sorted(list(agents_seen)):
+            corpus = store.get_corpus(agent_id)
+            if not corpus:
+                continue
+            learner = NativeStateMergingLearner(heuristic="alergia", alpha=0.05)
+            pdfa = learner.fit(corpus)
+            h = hashlib.sha256(json.dumps([t for t in corpus]).encode("utf-8")).hexdigest()[:16]
+            model_id = repo.save_model(
+                agent_id=agent_id,
+                pdfa=pdfa,
+                training_corpus_hash=h,
+                learner_config={"engine": "native-alergia", "alpha": 0.05, "source": "ingest-benchmark"},
+            )
+            repo.validate_model(model_id)
+            repo.promote_model(model_id, approver="benchmark-ingest")
+            print(f"  ✓ Inferred and activated PDFA for '{agent_id}': Model UUID {model_id} ({len(pdfa.states)} states, {len(pdfa.alphabet)} symbols)")
+
+    return 0 if (total_accepted > 0 or total_duplicates > 0) else 1
+
+
 if __name__ == "__main__":
     sys.exit(main())
+

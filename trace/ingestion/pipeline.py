@@ -177,4 +177,8 @@ class IngestionPipeline:
             return "mcp"
         if "node" in raw or "checkpoint" in raw or "subgraph" in raw:
             return "langgraph"
+        if "instance_id" in raw or ("action" in raw and "history" in raw):
+            return "swebench"
+        if "task_id" in raw or "action_type" in raw:
+            return "osworld"
         return None
