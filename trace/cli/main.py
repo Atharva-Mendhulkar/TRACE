@@ -349,7 +349,8 @@ def cmd_demo(auto: bool = False, step_delay: float = 0.1, db_path: str = "mock_d
         cli_box(f"TEST {num}/{total_steps}: {title.upper()}", [description], style_color=Style.VIOLET)
 
         if not auto_run and sys.stdin.isatty():
-            prompt_str = f"  {style('❯', Style.BOLD, Style.BRIGHT_VIOLET)} Press {style('[Enter]', Style.BOLD, Style.WHITE)} to run this step {style('(or \"a\" for auto-play, \"q\" to exit)', Style.DIM, Style.LAVENDER)}: "
+            step_hint = style('(or "a" for auto-play, "q" to exit)', Style.DIM, Style.LAVENDER)
+            prompt_str = f"  {style('❯', Style.BOLD, Style.BRIGHT_VIOLET)} Press {style('[Enter]', Style.BOLD, Style.WHITE)} to run this step {step_hint}: "
             try:
                 ans = input(prompt_str).strip().lower()
                 if ans == "q":
