@@ -30,6 +30,9 @@ from trace.schema.models import (
 logger = logging.getLogger("trace.storage.postgres")
 
 
+from sqlalchemy.pool import StaticPool
+
+
 class PostgresStore(TraceRepository, ModelRepository):
     """
     Production-grade relational store using PostgreSQL and pgvector,
@@ -39,7 +42,17 @@ class PostgresStore(TraceRepository, ModelRepository):
 
     def __init__(self, db_url: str = "sqlite:///:memory:", engine: Optional[Engine] = None):
         self.db_url = db_url
-        self.engine = engine or create_engine(db_url, echo=False)
+        if engine:
+            self.engine = engine
+        elif ":memory:" in db_url:
+            self.engine = create_engine(
+                db_url,
+                connect_args={"check_same_thread": False},
+                poolclass=StaticPool,
+                echo=False,
+            )
+        else:
+            self.engine = create_engine(db_url, echo=False)
         self.is_postgres = "postgresql" in self.engine.dialect.name.lower()
         self._init_schema()
 
@@ -94,13 +107,15 @@ class PostgresStore(TraceRepository, ModelRepository):
                         role TEXT,
                         taxonomy_version INTEGER NOT NULL DEFAULT 1,
                         training_corpus_hash TEXT NOT NULL,
-                        training_window_start TEXT NOT NULL,
-                        training_window_end TEXT NOT NULL,
+                        training_window_start TEXT,
+                        training_window_end TEXT,
                         learner_config TEXT NOT NULL,
                         evaluation_metrics TEXT,
                         status TEXT NOT NULL,
                         creator TEXT NOT NULL,
-                        automaton_data TEXT NOT NULL,
+                        automaton_data TEXT,
+                        pdfa_json TEXT,
+                        created_at TEXT,
                         trained_at TEXT,
                         validated_at TEXT,
                         promoted_at TEXT,
@@ -361,15 +376,16 @@ class PostgresStore(TraceRepository, ModelRepository):
                     model_id, model_version, agent_id, role, taxonomy_version,
                     training_corpus_hash, training_window_start, training_window_end,
                     learner_config, evaluation_metrics, status, creator,
-                    automaton_data, trained_at
+                    automaton_data, pdfa_json, created_at, trained_at
                 ) VALUES (
                     :model_id, :model_version, :agent_id, :role, :taxonomy_version,
                     :training_corpus_hash, :start_time, :end_time,
                     :learner_config, :evaluation_metrics, :status, :creator,
-                    :automaton_data, :trained_at
+                    :automaton_data, :pdfa_json, :created_at, :trained_at
                 )
                 """
             )
+            data_json = json.dumps(automaton_dict)
             conn.execute(
                 stmt,
                 {
@@ -385,7 +401,9 @@ class PostgresStore(TraceRepository, ModelRepository):
                     "evaluation_metrics": json.dumps(metrics),
                     "status": ModelLifecycleStatus.TRAINING.value,
                     "creator": "trace-pipeline",
-                    "automaton_data": json.dumps(automaton_dict),
+                    "automaton_data": data_json,
+                    "pdfa_json": data_json,
+                    "created_at": now,
                     "trained_at": now,
                 },
             )
@@ -395,11 +413,11 @@ class PostgresStore(TraceRepository, ModelRepository):
     def get_model(self, model_id: str) -> Optional[PDFA]:
         with self.engine.connect() as conn:
             res = conn.execute(
-                text("SELECT automaton_data FROM models WHERE model_id = :m_id"),
+                text("SELECT COALESCE(automaton_data, pdfa_json) FROM models WHERE model_id = :m_id"),
                 {"m_id": str(model_id)},
             ).fetchone()
 
-        if not res:
+        if not res or not res[0]:
             return None
         return self._deserialize_automaton(res[0])
 
@@ -408,7 +426,7 @@ class PostgresStore(TraceRepository, ModelRepository):
             res = conn.execute(
                 text(
                     """
-                    SELECT automaton_data FROM models
+                    SELECT COALESCE(automaton_data, pdfa_json) FROM models
                     WHERE agent_id = :a_id AND status = :s
                     ORDER BY model_version DESC LIMIT 1
                     """
@@ -416,7 +434,7 @@ class PostgresStore(TraceRepository, ModelRepository):
                 {"a_id": agent_id, "s": ModelLifecycleStatus.ACTIVE.value},
             ).fetchone()
 
-        if not res:
+        if not res or not res[0]:
             return None
         return self._deserialize_automaton(res[0])
 
@@ -425,7 +443,7 @@ class PostgresStore(TraceRepository, ModelRepository):
             res = conn.execute(
                 text(
                     """
-                    SELECT automaton_data FROM models
+                    SELECT COALESCE(automaton_data, pdfa_json) FROM models
                     WHERE role = :r AND status = :s
                     ORDER BY model_version DESC LIMIT 1
                     """
@@ -433,7 +451,7 @@ class PostgresStore(TraceRepository, ModelRepository):
                 {"r": role, "s": ModelLifecycleStatus.ACTIVE.value},
             ).fetchone()
 
-        if not res:
+        if not res or not res[0]:
             return None
         return self._deserialize_automaton(res[0])
 

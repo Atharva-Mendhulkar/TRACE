@@ -63,11 +63,24 @@ class FeedbackStore(ABC):
         pass
 
 
+from sqlalchemy.pool import StaticPool
+
+
 class RelationalFeedbackStore(FeedbackStore):
     """SQLAlchemy-backed feedback store compatible with PostgreSQL and SQLite."""
 
     def __init__(self, db_url: str = "sqlite:///:memory:", engine: Optional[Engine] = None):
-        self.engine = engine or create_engine(db_url, echo=False)
+        if engine:
+            self.engine = engine
+        elif ":memory:" in db_url:
+            self.engine = create_engine(
+                db_url,
+                connect_args={"check_same_thread": False},
+                poolclass=StaticPool,
+                echo=False,
+            )
+        else:
+            self.engine = create_engine(db_url, echo=False)
         self._init_schema()
 
     def _init_schema(self) -> None:

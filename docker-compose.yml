@@ -1,0 +1,97 @@
+# ============================================================================
+# TRACE Production Multi-Container Compose Configuration (PRD §35.1)
+# ============================================================================
+
+version: "3.8"
+
+services:
+  # Relational & Vector Persistence Backend
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: trace-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trace_admin
+      POSTGRES_PASSWORD: trace_secure_password
+      POSTGRES_DB: trace
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./trace/storage/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trace_admin -d trace"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Session State & Hot-Path Cache
+  redis:
+    image: redis:7-alpine
+    container_name: trace-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Ingestion & Control-Plane REST API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trace-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://trace_admin:trace_secure_password@postgres:5432/trace
+      REDIS_URL: redis://redis:6379/0
+      PORT: 8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["uvicorn", "trace.api.server:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+
+  # Real-Time Streaming Verifier Worker
+  verifier:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trace-verifier-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://trace_admin:trace_secure_password@postgres:5432/trace
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["python", "-m", "trace.cli.main", "adapter", "list"]
+
+  # Background Offline Learner & Drift Monitor
+  learner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trace-learner-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://trace_admin:trace_secure_password@postgres:5432/trace
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "-m", "trace.cli.main", "model", "list"]
+
+volumes:
+  postgres_data:
+  redis_data:

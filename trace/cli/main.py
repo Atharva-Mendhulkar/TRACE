@@ -113,6 +113,17 @@ def main(args: Optional[List[str]] = None) -> int:
     adp_sub = adp_p.add_subparsers(dest="adapter_cmd", required=True)
     adp_sub.add_parser("list", help="List registered framework adapters")
 
+    # 10. trace benchmark run (PRD §32, RQ1–RQ6)
+    bench_p = subparsers.add_parser("benchmark", help="Empirical evaluation benchmarks (PRD §32)")
+    bench_sub = bench_p.add_subparsers(dest="benchmark_cmd", required=True)
+    bench_run = bench_sub.add_parser("run", help="Run benchmark suite")
+    bench_run.add_argument(
+        "--rq",
+        choices=["1", "2", "3", "4", "5", "6", "all"],
+        default="all",
+        help="Research Question to evaluate",
+    )
+
     parsed = parser.parse_args(args)
 
     # Dispatch commands
@@ -142,6 +153,8 @@ def main(args: Optional[List[str]] = None) -> int:
             return cmd_feedback_list(parsed.db)
     elif parsed.command == "adapter" and parsed.adapter_cmd == "list":
         return cmd_adapter_list()
+    elif parsed.command == "benchmark" and parsed.benchmark_cmd == "run":
+        return cmd_benchmark_run(parsed.rq)
 
     return 0
 
@@ -436,6 +449,36 @@ def cmd_feedback_list(db_path: str) -> int:
     print("-" * 125)
     for r in records:
         print(f"{r.feedback_id:<38} | {r.violation_id:<38} | {r.feedback_type:<12} | {r.reviewer:<15} | {str(r.applied):<7}")
+    return 0
+
+
+def cmd_benchmark_run(rq: str) -> int:
+    from trace.benchmarks.evaluator import BenchmarkSuite
+    print(f"Starting TRACE Benchmark Suite (evaluating: {rq})...")
+    suite = BenchmarkSuite()
+
+    if rq == "all":
+        summary = suite.run_all()
+        print("\n" + summary.render_markdown())
+    elif rq == "1":
+        res1 = suite.run_rq1()
+        print(f"\nRQ1 Sample Complexity:\n  Sizes: {res1.sample_sizes}\n  States: {res1.state_counts}\n  Transitions: {res1.transition_counts}")
+    elif rq == "2":
+        res2 = suite.run_rq2()
+        print(f"\nRQ2 Anomaly Detection:\n  Precision: {res2.precision:.4f}\n  Recall: {res2.recall:.4f}\n  F1: {res2.f1:.4f}")
+    elif rq == "3":
+        res3 = suite.run_rq3()
+        print(f"\nRQ3 Latency Overhead:\n  Mean: {res3.mean_latency_ms:.4f}ms\n  p99: {res3.p99_latency_ms:.4f}ms\n  Budget Met (<5ms): {res3.budget_met}")
+    elif rq == "4":
+        res4 = suite.run_rq4()
+        print(f"\nRQ4 Policy Enforcement:\n  Accuracy: {res4.policy_enforcement_accuracy:.4f}\n  Violations Caught: {res4.violations_caught}")
+    elif rq == "5":
+        res5 = suite.run_rq5()
+        print(f"\nRQ5 Drift Detection:\n  Detected: {res5.drift_detected}\n  KS Statistic: {res5.ks_statistic:.4f}\n  p-value: {res5.p_value:.6f}")
+    elif rq == "6":
+        res6 = suite.run_rq6()
+        print(f"\nRQ6 Hierarchical State Reduction:\n  Flat: {res6.flat_states_count}\n  Hierarchical: {res6.hierarchical_states_count}\n  Reduction: {res6.reduction_percentage:.2f}%")
+
     return 0
 
 
