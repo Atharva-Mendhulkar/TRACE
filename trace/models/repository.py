@@ -14,6 +14,17 @@ from uuid import uuid4
 
 from trace.models.pdfa import PDFA
 
+import enum
+
+class ModelLifecycleStatus(str, enum.Enum):
+    TRAINING = "TRAINING"
+    VALIDATION = "VALIDATION"
+    CANDIDATE = "CANDIDATE"
+    PROMOTED = "PROMOTED"
+    ACTIVE = "ACTIVE"
+    SUPERSEDED = "SUPERSEDED"
+    ARCHIVED = "ARCHIVED"
+
 ModelStatus = Literal[
     "TRAINING",
     "VALIDATION",
@@ -213,6 +224,40 @@ class ModelRepository:
                 SET status = 'ACTIVE', promoted_at = ?, activated_at = ?
                 WHERE model_id = ?
             """, (now, now, model_id))
+            conn.commit()
+
+        return True
+
+    def activate_model(self, model_id: str) -> bool:
+        """Activate a model into production, marking existing active models as SUPERSEDED."""
+        model_info = self.get_model(model_id)
+        if not model_info:
+            return False
+
+        agent_id = model_info["agent_id"]
+        role = model_info.get("role")
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            if role:
+                cur.execute("""
+                    UPDATE models 
+                    SET status = 'SUPERSEDED', superseded_at = ?
+                    WHERE role = ? AND status = 'ACTIVE' AND model_id != ?
+                """, (now, role, model_id))
+            else:
+                cur.execute("""
+                    UPDATE models 
+                    SET status = 'SUPERSEDED', superseded_at = ?
+                    WHERE agent_id = ? AND status = 'ACTIVE' AND model_id != ?
+                """, (now, agent_id, model_id))
+
+            cur.execute("""
+                UPDATE models 
+                SET status = 'ACTIVE', activated_at = ?
+                WHERE model_id = ?
+            """, (now, model_id))
             conn.commit()
 
         return True

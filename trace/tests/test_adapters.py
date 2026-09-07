@@ -17,6 +17,12 @@ def test_adapter_registry():
     fws = [a["framework"] for a in adapters]
     assert "mcp" in fws
     assert "langgraph" in fws
+    assert "crewai" in fws
+    assert "openai_agents_sdk" in fws
+    assert "semantic_kernel" in fws
+    assert "google_adk" in fws
+    assert "autogen" in fws
+    assert len(fws) == 7
 
 
 def test_mcp_adapter_fixture_contract():
@@ -37,6 +43,71 @@ def test_langgraph_adapter_fixture_contract():
     fixture_file = FIXTURES_DIR / "langgraph_normal.json"
     pipeline = IngestionPipeline()
     result = pipeline.ingest_file(fixture_file, framework="langgraph")
+
+    assert len(result.rejected) == 0, f"Rejected events: {result.rejected}"
+    assert len(result.accepted) >= 3
+
+    for rec in result.accepted:
+        val = validate_ces_record(rec.model_dump())
+        assert val.is_valid, f"Record failed schema validation: {val.errors}"
+
+
+def test_crewai_adapter_fixture_contract():
+    fixture_file = FIXTURES_DIR / "crewai_normal.json"
+    pipeline = IngestionPipeline()
+    result = pipeline.ingest_file(fixture_file, framework="crewai")
+
+    assert len(result.rejected) == 0, f"Rejected events: {result.rejected}"
+    assert len(result.accepted) >= 3
+
+    for rec in result.accepted:
+        val = validate_ces_record(rec.model_dump())
+        assert val.is_valid, f"Record failed schema validation: {val.errors}"
+
+
+def test_openai_agents_adapter_fixture_contract():
+    fixture_file = FIXTURES_DIR / "openai_agents_normal.json"
+    pipeline = IngestionPipeline()
+    result = pipeline.ingest_file(fixture_file, framework="openai_agents_sdk")
+
+    assert len(result.rejected) == 0, f"Rejected events: {result.rejected}"
+    assert len(result.accepted) >= 3
+
+    for rec in result.accepted:
+        val = validate_ces_record(rec.model_dump())
+        assert val.is_valid, f"Record failed schema validation: {val.errors}"
+
+
+def test_semantic_kernel_adapter_fixture_contract():
+    fixture_file = FIXTURES_DIR / "semantic_kernel_normal.json"
+    pipeline = IngestionPipeline()
+    result = pipeline.ingest_file(fixture_file, framework="semantic_kernel")
+
+    assert len(result.rejected) == 0, f"Rejected events: {result.rejected}"
+    assert len(result.accepted) >= 3
+
+    for rec in result.accepted:
+        val = validate_ces_record(rec.model_dump())
+        assert val.is_valid, f"Record failed schema validation: {val.errors}"
+
+
+def test_google_adk_adapter_fixture_contract():
+    fixture_file = FIXTURES_DIR / "google_adk_normal.json"
+    pipeline = IngestionPipeline()
+    result = pipeline.ingest_file(fixture_file, framework="google_adk")
+
+    assert len(result.rejected) == 0, f"Rejected events: {result.rejected}"
+    assert len(result.accepted) >= 3
+
+    for rec in result.accepted:
+        val = validate_ces_record(rec.model_dump())
+        assert val.is_valid, f"Record failed schema validation: {val.errors}"
+
+
+def test_autogen_adapter_fixture_contract():
+    fixture_file = FIXTURES_DIR / "autogen_normal.json"
+    pipeline = IngestionPipeline()
+    result = pipeline.ingest_file(fixture_file, framework="autogen")
 
     assert len(result.rejected) == 0, f"Rejected events: {result.rejected}"
     assert len(result.accepted) >= 3

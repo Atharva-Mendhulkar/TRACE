@@ -1,0 +1,46 @@
+[
+  {
+    "session_id": "g0000000-0000-0000-0000-000000000001",
+    "invocation_id": "inv_001",
+    "agent_id": "adk_concierge",
+    "adk_version": "1.0",
+    "event": "model_turn",
+    "name": "plan_travel_itinerary",
+    "sequence_no": 0
+  },
+  {
+    "session_id": "g0000000-0000-0000-0000-000000000001",
+    "invocation_id": "inv_001",
+    "agent_id": "adk_concierge",
+    "adk_version": "1.0",
+    "function_call": {
+      "name": "book_flight",
+      "args": {
+        "destination": "HND",
+        "passengers": 2,
+        "class": "business"
+      }
+    },
+    "response": {
+      "booking_reference": "FL_88291"
+    },
+    "sequence_no": 1
+  },
+  {
+    "session_id": "g0000000-0000-0000-0000-000000000001",
+    "invocation_id": "inv_001",
+    "agent_id": "adk_concierge",
+    "adk_version": "1.0",
+    "event": "dispatch",
+    "dispatch_to": "hotel_booking_agent",
+    "sequence_no": 3
+  },
+  {
+    "session_id": "g0000000-0000-0000-0000-000000000001",
+    "invocation_id": "inv_001",
+    "agent_id": "adk_concierge",
+    "adk_version": "1.0",
+    "event": "session_complete",
+    "sequence_no": 4
+  }
+]

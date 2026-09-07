@@ -132,6 +132,23 @@ class ValidationResult(BaseModel):
     schema_version: str = "1.0"
 
 
+class ViolationRecord(BaseModel):
+    """Runtime violation record conforming to PRD §29."""
+
+    violation_id: str = Field(default_factory=lambda: str(uuid4()))
+    trace_id: str
+    event_id: str
+    agent_id: str
+    role: Optional[str] = None
+    classification: List[str] = Field(default_factory=list)
+    explanation: Dict[str, Any] = Field(default_factory=dict)
+    model_id: Optional[str] = None
+    policy_id: Optional[str] = None
+    created_at: str = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat()
+    )
+
+
 _SCHEMA_CACHE: Optional[Dict[str, Any]] = None
 
 

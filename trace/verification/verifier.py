@@ -12,6 +12,7 @@ from trace.models.pdfa import PDFA
 from trace.policy.compiler import PolicyDFA
 from trace.policy.product import ClassificationResult, ProductAutomaton
 from trace.schema.models import CESRecord
+from trace.verification.session_cache import SessionCache
 
 
 @dataclass
@@ -60,14 +61,41 @@ class RuntimeVerifier:
             self.history[key] = []
         return self.sessions[key]
 
-    def verify_event(self, event: CESRecord) -> VerificationResponse:
-        """Verify a single incoming execution event."""
+    def verify_event(
+        self, event: CESRecord, session_cache: Optional[SessionCache] = None
+    ) -> VerificationResponse:
+        """Verify a single incoming execution event with optional stream session caching."""
         session = self.get_or_create_session(event.trace_id, event.span_id)
         history = self.history[(event.trace_id, event.span_id)]
+
+        # Restore from cache if available
+        if session_cache:
+            cached = session_cache.get_session(event.trace_id, event.span_id)
+            if cached:
+                session.q_learned = cached.current_learned_state
+                session.q_policy = cached.current_policy_state
+                session.valid_event_count = cached.running_events_count
+                session.total_nll = cached.running_mean_nll * cached.running_events_count
 
         # Step product automaton
         classification = session.step(event.symbol)
         history.append(event.symbol)
+
+        # Update cache if session_cache provided
+        if session_cache:
+            from trace.verification.session_cache import VerificationSessionState
+            new_state = VerificationSessionState(
+                trace_id=event.trace_id,
+                span_id=event.span_id,
+                model_id=self.model_version,
+                policy_id=self.policy_version,
+                current_learned_state=session.q_learned,
+                current_policy_state=session.q_policy,
+                running_mean_nll=classification.running_mean_nll,
+                running_events_count=session.valid_event_count,
+                last_event_time=event.timestamp,
+            )
+            session_cache.set_session(new_state)
 
         violation_explanation = None
         allowed = True

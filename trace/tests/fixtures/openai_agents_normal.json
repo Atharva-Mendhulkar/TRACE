@@ -1,0 +1,51 @@
+[
+  {
+    "run_id": "o0000000-0000-0000-0000-000000000001",
+    "agent_name": "triage_agent",
+    "openai_version": "1.0",
+    "event": "run.step",
+    "name": "assess_user_inquiry",
+    "sequence_no": 0
+  },
+  {
+    "run_id": "o0000000-0000-0000-0000-000000000001",
+    "agent_name": "triage_agent",
+    "openai_version": "1.0",
+    "tool_calls": [
+      {
+        "id": "call_987",
+        "type": "function",
+        "function": {
+          "name": "lookup_customer_account",
+          "arguments": "{\"customer_id\": \"cust_12345\", \"include_billing\": true}"
+        }
+      }
+    ],
+    "sequence_no": 1
+  },
+  {
+    "run_id": "o0000000-0000-0000-0000-000000000001",
+    "agent_name": "triage_agent",
+    "openai_version": "1.0",
+    "role": "tool",
+    "name": "lookup_customer_account",
+    "content": "{\"status\": \"active\", \"tier\": \"enterprise\"}",
+    "sequence_no": 2
+  },
+  {
+    "run_id": "o0000000-0000-0000-0000-000000000001",
+    "agent_name": "triage_agent",
+    "openai_version": "1.0",
+    "event": "handoff",
+    "target_agent": "billing_specialist",
+    "sequence_no": 3
+  },
+  {
+    "run_id": "o0000000-0000-0000-0000-000000000001",
+    "agent_name": "triage_agent",
+    "openai_version": "1.0",
+    "event": "run.completed",
+    "finish_reason": "stop",
+    "sequence_no": 4
+  }
+]

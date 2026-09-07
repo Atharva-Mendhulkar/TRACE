@@ -11,6 +11,11 @@ from trace.adapters.base import (
 )
 import trace.adapters.mcp
 import trace.adapters.langgraph
+import trace.adapters.crewai
+import trace.adapters.openai_agents
+import trace.adapters.semantic_kernel
+import trace.adapters.google_adk
+import trace.adapters.autogen
 
 __all__ = [
     "FrameworkAdapter",

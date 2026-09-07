@@ -1,0 +1,41 @@
+[
+  {
+    "kernel_id": "s0000000-0000-0000-0000-000000000001",
+    "agent_id": "sk_planner_agent",
+    "semantic_kernel_version": "1.0",
+    "plugin_name": "SemanticMemory",
+    "function_name": "search",
+    "event": "memory_read",
+    "sequence_no": 0
+  },
+  {
+    "kernel_id": "s0000000-0000-0000-0000-000000000001",
+    "agent_id": "sk_planner_agent",
+    "semantic_kernel_version": "1.0",
+    "plugin_name": "DatabasePlugin",
+    "function_name": "query_inventory",
+    "event": "function_invoking",
+    "arguments": {
+      "item_id": "SKU_4491",
+      "warehouse": "US-WEST"
+    },
+    "result": {"quantity": 42},
+    "sequence_no": 1
+  },
+  {
+    "kernel_id": "s0000000-0000-0000-0000-000000000001",
+    "agent_id": "sk_planner_agent",
+    "semantic_kernel_version": "1.0",
+    "plugin_name": "AuditLog",
+    "function_name": "record_event",
+    "event": "memory_write",
+    "sequence_no": 3
+  },
+  {
+    "kernel_id": "s0000000-0000-0000-0000-000000000001",
+    "agent_id": "sk_planner_agent",
+    "semantic_kernel_version": "1.0",
+    "event": "pipeline_end",
+    "sequence_no": 4
+  }
+]

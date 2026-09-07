@@ -1,0 +1,38 @@
+[
+  {
+    "crew_id": "c0000000-0000-0000-0000-000000000001",
+    "agent_role": "lead_researcher",
+    "crewai_version": "0.2",
+    "event": "task_start",
+    "task": "gather_market_intelligence",
+    "step": 0
+  },
+  {
+    "crew_id": "c0000000-0000-0000-0000-000000000001",
+    "agent_role": "lead_researcher",
+    "crewai_version": "0.2",
+    "event": "tool_usage",
+    "tool_name": "web_scrape",
+    "tool_input": {
+      "url": "https://example.com/data",
+      "depth": 2
+    },
+    "result": "Scraped 15 records successfully",
+    "step": 1
+  },
+  {
+    "crew_id": "c0000000-0000-0000-0000-000000000001",
+    "agent_role": "lead_researcher",
+    "crewai_version": "0.2",
+    "event": "delegate_work_to_coworker",
+    "coworker": "analyst",
+    "step": 3
+  },
+  {
+    "crew_id": "c0000000-0000-0000-0000-000000000001",
+    "agent_role": "lead_researcher",
+    "crewai_version": "0.2",
+    "event": "crew_finish",
+    "step": 4
+  }
+]

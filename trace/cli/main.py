@@ -85,8 +85,30 @@ def main(args: Optional[List[str]] = None) -> int:
     mod_insp = mod_sub.add_parser("inspect", help="Inspect a model")
     mod_insp.add_argument("model_id", help="Model UUID")
     mod_insp.add_argument("--db", default=DEFAULT_DB, help="Database file path")
+    mod_prom = mod_sub.add_parser("promote", help="Promote a candidate model (PRD M10, §23.4)")
+    mod_prom.add_argument("model_id", help="Model UUID")
+    mod_prom.add_argument("--activate", action="store_true", help="Also activate model into production")
+    mod_prom.add_argument("--db", default=DEFAULT_DB, help="Database file path")
 
-    # 8. trace adapter list
+    # 8. trace feedback record / list (PRD M10, §23.4)
+    fb_p = subparsers.add_parser("feedback", help="Human-in-the-loop violation feedback")
+    fb_sub = fb_p.add_subparsers(dest="feedback_cmd", required=True)
+    fb_rec = fb_sub.add_parser("record", help="Record reviewer feedback on a violation")
+    fb_rec.add_argument("--violation-id", "-v", required=True, help="Violation UUID")
+    fb_rec.add_argument(
+        "--type",
+        "-t",
+        required=True,
+        choices=["approve", "reject", "override_transition"],
+        help="Feedback type",
+    )
+    fb_rec.add_argument("--reviewer", "-r", required=True, help="Reviewer username")
+    fb_rec.add_argument("--comment", "-c", help="Review comment")
+    fb_rec.add_argument("--db", default=DEFAULT_DB, help="Database file path")
+    fb_list = fb_sub.add_parser("list", help="List recorded feedback")
+    fb_list.add_argument("--db", default=DEFAULT_DB, help="Database file path")
+
+    # 9. trace adapter list
     adp_p = subparsers.add_parser("adapter", help="Adapter management")
     adp_sub = adp_p.add_subparsers(dest="adapter_cmd", required=True)
     adp_sub.add_parser("list", help="List registered framework adapters")
@@ -111,6 +133,13 @@ def main(args: Optional[List[str]] = None) -> int:
             return cmd_model_list(parsed.agent_id, parsed.db)
         elif parsed.model_cmd == "inspect":
             return cmd_model_inspect(parsed.model_id, parsed.db)
+        elif parsed.model_cmd == "promote":
+            return cmd_model_promote(parsed.model_id, parsed.activate, parsed.db)
+    elif parsed.command == "feedback":
+        if parsed.feedback_cmd == "record":
+            return cmd_feedback_record(parsed.violation_id, parsed.type, parsed.reviewer, parsed.comment, parsed.db)
+        elif parsed.feedback_cmd == "list":
+            return cmd_feedback_list(parsed.db)
     elif parsed.command == "adapter" and parsed.adapter_cmd == "list":
         return cmd_adapter_list()
 
@@ -356,6 +385,57 @@ def cmd_adapter_list() -> int:
     print("Registered Framework Adapters:")
     for a in adapters:
         print(f"  Framework: {a['framework']:<18} | Adapter Ver: {a['adapter_version']:<6} | Supported Schemas: {', '.join(a['supported_framework_schema_versions'])}")
+    return 0
+
+
+def cmd_model_promote(model_id: str, activate: bool, db_path: str) -> int:
+    from trace.feedback.engine import FeedbackEngine
+    repo = ModelRepository(db_path)
+    engine = FeedbackEngine(model_repo=repo)
+    try:
+        res = engine.review_candidate_model(model_id, action="approve", reviewer="cli-operator")
+        print(f"Model '{model_id}' promoted to status: {res['status']}")
+        if activate:
+            act_res = engine.activate_promoted_model(model_id)
+            print(f"Model '{model_id}' activated into production: {act_res['status']}")
+        return 0
+    except Exception as e:
+        print(f"Error promoting model '{model_id}': {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_feedback_record(violation_id: str, feedback_type: str, reviewer: str, comment: Optional[str], db_path: str) -> int:
+    from trace.feedback.engine import FeedbackEngine, RelationalFeedbackStore
+    store = RelationalFeedbackStore(f"sqlite:///{db_path}")
+    engine = FeedbackEngine(store=store)
+    record = engine.record_feedback(
+        violation_id=violation_id,
+        feedback_type=feedback_type,  # type: ignore
+        reviewer=reviewer,
+        comment=comment,
+    )
+    print(f"Recorded feedback ID: {record.feedback_id}")
+    print(f"  Violation ID:  {record.violation_id}")
+    print(f"  Type:          {record.feedback_type}")
+    print(f"  Reviewer:      {record.reviewer}")
+    if record.comment:
+        print(f"  Comment:       {record.comment}")
+    return 0
+
+
+def cmd_feedback_list(db_path: str) -> int:
+    from trace.feedback.engine import FeedbackEngine, RelationalFeedbackStore
+    store = RelationalFeedbackStore(f"sqlite:///{db_path}")
+    engine = FeedbackEngine(store=store)
+    records = engine.list_feedback()
+    if not records:
+        print("No feedback records found.")
+        return 0
+
+    print(f"{'Feedback ID':<38} | {'Violation ID':<38} | {'Type':<12} | {'Reviewer':<15} | {'Applied':<7}")
+    print("-" * 125)
+    for r in records:
+        print(f"{r.feedback_id:<38} | {r.violation_id:<38} | {r.feedback_type:<12} | {r.reviewer:<15} | {str(r.applied):<7}")
     return 0
 
 
