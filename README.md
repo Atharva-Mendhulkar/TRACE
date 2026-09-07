@@ -233,31 +233,58 @@ docker compose up --build -d
 
 ---
 
-## CLI Reference & Mock Data Test Suite
+## CLI Reference & Interactive Shell
 
-TRACE provides an interactive, Posit/R-`cli`-inspired semantic command-line interface featuring colored banners, styled alert badges (`✔`, `ℹ`, `▲`, `✖`), formatted Unicode tables, and inspection views.
+TRACE provides an interactive, Posit/R-`cli`-inspired semantic command-line interface featuring an **Electric Violet accent theme**, formatted Unicode tables, styled alert badges (`✔`, `ℹ`, `▲`, `✖`), and a **persistent interactive shell environment**.
 
-### Mock Dataset (`mock_data/`)
-
-The repository includes a self-contained mock dataset in [`mock_data/`](mock_data/) to test and verify every CLI capability:
-
-| File | Format / Framework | Description |
-|---|---|---|
-| [`mock_data/events.json`](mock_data/events.json) | MCP JSON-RPC 2.0 | Multi-agent execution traces (`research-agent`, `security-agent`) |
-| [`mock_data/benchmark_trajectories.json`](mock_data/benchmark_trajectories.json) | SWE-bench Format | Benchmark trajectories (`search_code` $\to$ `read_file` $\to$ `edit_file` $\to$ `run_test` $\to$ `submit`) |
-| [`mock_data/compliance_policy.policy`](mock_data/compliance_policy.policy) | TRACE Policy DSL | Declarative temporal safety rules (`REQUIRE`, `FORBID SEQUENCE`, `LIMIT`) |
-| [`mock_data/anomalous_events.json`](mock_data/anomalous_events.json) | MCP JSON-RPC 2.0 | Policy violation trace (`scan_network` without prior `auth_check`) |
-| [`mock_data/test_cli.sh`](mock_data/test_cli.sh) | Bash Script | **Automated test script executing all 19 CLI operations end-to-end** |
-
-### One-Line Complete CLI Test
-Execute the comprehensive end-to-end test suite against the mock dataset:
+### Interactive Shell Mode (No need to prefix `trace`!)
+Simply run `trace` with no arguments to enter the persistent interactive shell:
 ```bash
-bash mock_data/test_cli.sh
+trace
+```
+Inside the interactive shell:
+```
+  ╱$$                                           
+ │ $$                                           
+╱$$$$$$    ╱$$$$$$  ╱$$$$$$   ╱$$$$$$$  ╱$$$$$$ 
+│_  $$_╱   ╱$$__  $$│____  $$ ╱$$_____╱ ╱$$__  $$
+  │ $$    │ $$  ╲__╱ ╱$$$$$$$│ $$      │ $$$$$$$$
+  │ $$ ╱$$│ $$      ╱$$__  $$│ $$      │ $$_____╱
+  │  $$$$╱│ $$     │  $$$$$$$│  $$$$$$$│  $$$$$$$
+   ╲___╱  │__╱      ╲_______╱ ╲_______╱ ╲_______╱
+   v1.0.0   Trace-based Runtime Automata for Compliance & Enforcement
+  Formal Behavioral Inference & Temporal Policy Verification for AI Agents
+
+╭─ TRACE INTERACTIVE SESSION ───────────────────────────────────────────────────╮
+│  Welcome to the TRACE Interactive Shell!                                        │
+│  • Type commands directly without 'trace': e.g. 'demo', 'adapter list', 'help'  │
+│  • Type 'demo' to run the automated step-by-step mock data demonstration        │
+│  • Type 'exit' or 'quit' to return to your system shell                         │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+trace ❯ adapter list
+trace ❯ demo
+trace ❯ exit
 ```
 
 ---
 
-### Step-by-Step CLI Commands
+### Step-by-Step Interactive Demo (`demo`)
+
+Run the complete 12-step end-to-end demonstration using the built-in mock dataset with live progress bars and formatted tables:
+
+- **Inside Interactive Shell**:
+  ```
+  trace ❯ demo
+  ```
+- **From Terminal Directly**:
+  ```bash
+  trace demo
+  ```
+
+---
+
+### Step-by-Step CLI Commands (Direct or In-Shell)
 
 #### 1. Adapter Registry
 ```bash

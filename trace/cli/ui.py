@@ -1,6 +1,7 @@
 """
 TRACE Semantic CLI UI Engine.
 Inspired by R/Posit cli and Python rich libraries.
+Accent color: Electric Violet / Purple.
 Provides semantic elements: banners, headings, alerts, rules, boxes, tables, and key-value cards.
 """
 
@@ -40,10 +41,20 @@ class Style:
     BRIGHT_CYAN = "\033[96m"
     BRIGHT_WHITE = "\033[97m"
 
+    # Violet Accent Palette (User requested accent color: Violet)
+    VIOLET = "\033[38;5;141m"        # Radiant medium violet
+    BRIGHT_VIOLET = "\033[38;5;177m" # Vibrant light violet
+    DEEP_VIOLET = "\033[38;5;99m"    # Deep rich violet
+    PURPLE = "\033[38;5;135m"         # Neon purple
+    LAVENDER = "\033[38;5;183m"       # Pale lavender
+    DARK_VIOLET = "\033[38;5;55m"     # Border deep violet
+
     # Backgrounds
+    BG_VIOLET = "\033[48;5;99m"
+    BG_PURPLE = "\033[48;5;54m"
+    BG_DARK_VIOLET = "\033[48;5;17m"
     BG_BLUE = "\033[44m"
     BG_MAGENTA = "\033[45m"
-    BG_CYAN = "\033[46m"
     BG_BLACK = "\033[40m"
 
 
@@ -93,18 +104,18 @@ ASCII_BANNER_LINES = [
 
 
 def cli_banner(version: str = "1.0.0", print_out: bool = True) -> str:
-    """Render the official TRACE cyan/indigo ASCII art banner and subtitle."""
+    """Render the official TRACE violet/purple ASCII art banner and subtitle."""
     out: List[str] = []
-    # Gradient colors across lines: Cyan -> Bright Blue -> Magenta
+    # Violet gradient across lines: Lavender -> Bright Violet -> Radiant Violet -> Purple -> Deep Violet
     gradients = [
-        (Style.BRIGHT_CYAN,),
-        (Style.BRIGHT_CYAN,),
-        (Style.CYAN, Style.BOLD),
-        (Style.CYAN,),
-        (Style.BRIGHT_BLUE, Style.BOLD),
-        (Style.BRIGHT_BLUE,),
-        (Style.BRIGHT_MAGENTA, Style.BOLD),
-        (Style.MAGENTA,),
+        (Style.LAVENDER, Style.BOLD),
+        (Style.LAVENDER, Style.BOLD),
+        (Style.BRIGHT_VIOLET, Style.BOLD),
+        (Style.BRIGHT_VIOLET,),
+        (Style.VIOLET, Style.BOLD),
+        (Style.VIOLET,),
+        (Style.PURPLE, Style.BOLD),
+        (Style.DEEP_VIOLET,),
     ]
 
     out.append("")
@@ -112,9 +123,9 @@ def cli_banner(version: str = "1.0.0", print_out: bool = True) -> str:
         color_styles = gradients[i % len(gradients)]
         out.append(style(line, *color_styles))
 
-    tag = style(f" v{version} ", Style.BOLD, Style.BRIGHT_WHITE, Style.BG_BLUE)
+    tag = style(f" v{version} ", Style.BOLD, Style.BRIGHT_WHITE, Style.BG_VIOLET)
     title = style("Trace-based Runtime Automata for Compliance & Enforcement", Style.BOLD, Style.WHITE)
-    subtitle = style("Formal Behavioral Inference & Temporal Policy Verification for AI Agents", Style.DIM, Style.CYAN)
+    subtitle = style("Formal Behavioral Inference & Temporal Policy Verification for AI Agents", Style.DIM, Style.LAVENDER)
 
     out.append(f"  {tag}  {title}")
     out.append(f"  {subtitle}")
@@ -126,7 +137,7 @@ def cli_banner(version: str = "1.0.0", print_out: bool = True) -> str:
     return rendered
 
 
-# Semantic Alert Messages (R cli inspired)
+# Semantic Alert Messages
 def cli_alert_success(text: str, print_out: bool = True) -> str:
     """Success alert message with a bright green checkmark."""
     prefix = style("✔", Style.BOLD, Style.BRIGHT_GREEN)
@@ -138,8 +149,8 @@ def cli_alert_success(text: str, print_out: bool = True) -> str:
 
 
 def cli_alert_info(text: str, print_out: bool = True) -> str:
-    """Informational alert message with a cyan info glyph."""
-    prefix = style("ℹ", Style.BOLD, Style.BRIGHT_CYAN)
+    """Informational alert message with a radiant violet glyph."""
+    prefix = style("ℹ", Style.BOLD, Style.BRIGHT_VIOLET)
     content = style(text, Style.WHITE)
     line = f"{prefix}  {content}"
     if print_out:
@@ -168,28 +179,28 @@ def cli_alert_danger(text: str, print_out: bool = True) -> str:
 
 
 def cli_alert(text: str, print_out: bool = True) -> str:
-    """Generic bulleted alert message."""
-    prefix = style("•", Style.BOLD, Style.CYAN)
+    """Generic bulleted alert message with a violet bullet."""
+    prefix = style("•", Style.BOLD, Style.VIOLET)
     line = f"{prefix}  {text}"
     if print_out:
         print(line)
     return line
 
 
-# Semantic Headings
+# Semantic Headings with Violet Accent
 def cli_h1(text: str, print_out: bool = True) -> str:
-    """Level 1 heading: uppercase bold cyan with double-line divider."""
-    header = style(f"\n═══  {text.upper()}  ═══", Style.BOLD, Style.BRIGHT_CYAN)
+    """Level 1 heading: uppercase bold bright violet with double-line divider."""
+    header = style(f"\n═══  {text.upper()}  ═══", Style.BOLD, Style.BRIGHT_VIOLET)
     if print_out:
         print(header)
     return header
 
 
 def cli_h2(text: str, print_out: bool = True) -> str:
-    """Level 2 heading: bold white with subtle underline bar."""
-    title = style(f"\n── {text} ", Style.BOLD, Style.BRIGHT_MAGENTA)
+    """Level 2 heading: bold white with subtle violet underline bar."""
+    title = style(f"\n── {text} ", Style.BOLD, Style.BRIGHT_VIOLET)
     fill_len = max(0, 70 - len(strip_ansi(title)))
-    rule = style("─" * fill_len, Style.DIM, Style.MAGENTA)
+    rule = style("─" * fill_len, Style.DIM, Style.DEEP_VIOLET)
     header = f"{title}{rule}"
     if print_out:
         print(header)
@@ -197,38 +208,38 @@ def cli_h2(text: str, print_out: bool = True) -> str:
 
 
 def cli_h3(text: str, print_out: bool = True) -> str:
-    """Level 3 heading: bullet arrow heading."""
-    header = f"\n  {style('❯', Style.BOLD, Style.BRIGHT_CYAN)} {style(text, Style.BOLD, Style.WHITE)}"
+    """Level 3 heading: bullet arrow heading with radiant violet pointer."""
+    header = f"\n  {style('❯', Style.BOLD, Style.BRIGHT_VIOLET)} {style(text, Style.BOLD, Style.WHITE)}"
     if print_out:
         print(header)
     return header
 
 
 def cli_rule(title: str = "", char: str = "─", width: int = 76, print_out: bool = True) -> str:
-    """Horizontal divider line with optional title."""
+    """Horizontal divider line with optional violet title."""
     if not title:
-        line = style(char * width, Style.DIM, Style.BRIGHT_BLACK)
+        line = style(char * width, Style.DIM, Style.DEEP_VIOLET)
     else:
         styled_title = f" {title} "
         raw_len = len(title) + 2
         remaining = max(0, width - raw_len - 4)
         left = char * 3
         right = char * remaining
-        line = f"{style(left, Style.DIM, Style.BRIGHT_BLACK)}{style(styled_title, Style.BOLD, Style.CYAN)}{style(right, Style.DIM, Style.BRIGHT_BLACK)}"
+        line = f"{style(left, Style.DIM, Style.DEEP_VIOLET)}{style(styled_title, Style.BOLD, Style.VIOLET)}{style(right, Style.DIM, Style.DEEP_VIOLET)}"
     if print_out:
         print(line)
     return line
 
 
-# Semantic Box / Panel
+# Semantic Box / Panel with Violet Border
 def cli_box(
     title: str,
     lines: Sequence[str],
-    style_color: str = Style.CYAN,
+    style_color: str = Style.VIOLET,
     width: Optional[int] = None,
     print_out: bool = True,
 ) -> str:
-    """Render a clean rounded box containing styled lines."""
+    """Render a clean rounded box with violet borders containing styled lines."""
     raw_lengths = [len(strip_ansi(l)) for l in lines]
     raw_lengths.append(len(title) + 4)
     content_width = max(raw_lengths) if raw_lengths else 40
@@ -258,10 +269,10 @@ def cli_box(
 
 # Semantic Key-Value Pairs
 def cli_kv(key: str, value: Any, indent: int = 2, key_width: int = 18, print_out: bool = True) -> str:
-    """Print an aligned key-value pair."""
+    """Print an aligned key-value pair with violet keys."""
     indent_str = " " * indent
-    k_styled = style(f"{key:<{key_width}}", Style.DIM, Style.CYAN)
-    sep = style(":", Style.DIM, Style.BRIGHT_BLACK)
+    k_styled = style(f"{key:<{key_width}}", Style.DIM, Style.VIOLET)
+    sep = style(":", Style.DIM, Style.DEEP_VIOLET)
     v_styled = style(str(value), Style.BOLD, Style.WHITE)
     line = f"{indent_str}{k_styled} {sep}  {v_styled}"
     if print_out:
@@ -274,37 +285,39 @@ def cli_badge(text: str, category: str = "info") -> str:
     """Generate a high-visibility badge pill."""
     cat = category.lower()
     if cat in ("success", "active", "passed", "pass"):
-        return style(f" {text} ", Style.BOLD, Style.BRIGHT_WHITE, Style.BG_BLUE)  # Or GREEN
+        return style(f" {text} ", Style.BOLD, Style.BRIGHT_WHITE, Style.BG_VIOLET)
     elif cat in ("warning", "candidate", "pending"):
-        return style(f" {text} ", Style.BOLD, Style.BLACK, Style.BG_CYAN)
+        return style(f" {text} ", Style.BOLD, Style.BLACK, "\033[48;5;183m")
     elif cat in ("danger", "error", "failed", "rejected", "retired"):
         return style(f" {text} ", Style.BOLD, Style.BRIGHT_WHITE, "\033[41m")
     else:
-        return style(f" {text} ", Style.BOLD, Style.BRIGHT_WHITE, Style.BG_MAGENTA)
+        return style(f" {text} ", Style.BOLD, Style.BRIGHT_WHITE, Style.BG_PURPLE)
 
 
 def status_pill(status: str) -> str:
-    """Render a status string with appropriate color and symbol."""
+    """Render a status string with appropriate violet/green colors and symbols."""
     s = status.upper()
     if s == "ACTIVE":
         return f"{style('●', Style.BRIGHT_GREEN)} {style('ACTIVE', Style.BOLD, Style.GREEN)}"
     elif s == "CANDIDATE":
-        return f"{style('○', Style.BRIGHT_CYAN)} {style('CANDIDATE', Style.BOLD, Style.CYAN)}"
+        return f"{style('○', Style.BRIGHT_VIOLET)} {style('CANDIDATE', Style.BOLD, Style.VIOLET)}"
     elif s == "RETIRED":
         return f"{style('◌', Style.DIM, Style.WHITE)} {style('RETIRED', Style.DIM, Style.WHITE)}"
     elif s == "REJECTED":
         return f"{style('✕', Style.BRIGHT_RED)} {style('REJECTED', Style.BOLD, Style.RED)}"
+    elif s == "PROMOTED":
+        return f"{style('★', Style.BRIGHT_VIOLET)} {style('PROMOTED', Style.BOLD, Style.BRIGHT_VIOLET)}"
     return status
 
 
-# Semantic Unicode Tables
+# Semantic Unicode Tables with Violet Borders
 def cli_table(
     headers: Sequence[str],
     rows: Sequence[Sequence[Any]],
     alignments: Optional[Sequence[str]] = None,
     print_out: bool = True,
 ) -> str:
-    """Render an aligned Unicode box table with headers and row lines."""
+    """Render an aligned Unicode box table with violet borders."""
     if not headers and not rows:
         return ""
 
@@ -324,15 +337,11 @@ def cli_table(
     col_widths = [w + 2 for w in col_widths]
 
     # Border definitions
-    # ┌───┬───┐
-    # │   │   │
-    # ├───┼───┤
-    # └───┴───┘
     t_top = "┌" + "┬".join("─" * w for w in col_widths) + "┐"
     t_mid = "├" + "┼".join("─" * w for w in col_widths) + "┤"
     t_bot = "└" + "┴".join("─" * w for w in col_widths) + "┘"
 
-    out = [style(t_top, Style.DIM, Style.CYAN)]
+    out = [style(t_top, Style.VIOLET)]
 
     # Format header row
     hdr_cells = []
@@ -342,9 +351,9 @@ def cli_table(
         cell_str = f" {h}{' ' * (w - text_len - 1)}"
         hdr_cells.append(style(cell_str, Style.BOLD, Style.BRIGHT_WHITE))
 
-    pipe = style("│", Style.DIM, Style.CYAN)
+    pipe = style("│", Style.VIOLET)
     out.append(f"{pipe}{pipe.join(hdr_cells)}{pipe}")
-    out.append(style(t_mid, Style.DIM, Style.CYAN))
+    out.append(style(t_mid, Style.VIOLET))
 
     # Format rows
     for row in rows:
@@ -371,7 +380,7 @@ def cli_table(
 
         out.append(f"{pipe}{pipe.join(row_cells)}{pipe}")
 
-    out.append(style(t_bot, Style.DIM, Style.CYAN))
+    out.append(style(t_bot, Style.VIOLET))
 
     rendered = "\n".join(out)
     if print_out:
@@ -379,9 +388,9 @@ def cli_table(
     return rendered
 
 
-# Semantic Progress Bar
+# Semantic Progress Bar with Violet Fill
 def cli_progress_bar(current: int, total: int, width: int = 28, label: str = "") -> str:
-    """Render a progress bar string."""
+    """Render a progress bar string with electric violet progress."""
     if total <= 0:
         pct = 1.0
     else:
@@ -389,8 +398,8 @@ def cli_progress_bar(current: int, total: int, width: int = 28, label: str = "")
 
     filled = int(round(width * pct))
     unfilled = width - filled
-    bar = style("━" * filled, Style.BOLD, Style.BRIGHT_CYAN) + style("─" * unfilled, Style.DIM, Style.BRIGHT_BLACK)
+    bar = style("━" * filled, Style.BOLD, Style.BRIGHT_VIOLET) + style("─" * unfilled, Style.DIM, Style.DEEP_VIOLET)
     pct_text = style(f"{int(pct * 100):>3}%", Style.BOLD, Style.WHITE)
-    counts = style(f"({current}/{total})", Style.DIM, Style.CYAN)
+    counts = style(f"({current}/{total})", Style.DIM, Style.LAVENDER)
     lbl = f"{style(label, Style.BOLD, Style.WHITE)}  " if label else ""
     return f"{lbl}[{bar}] {pct_text} {counts}"

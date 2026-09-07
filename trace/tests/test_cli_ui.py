@@ -118,3 +118,29 @@ def test_cli_main_adapter_list(capsys):
     assert "langgraph" in captured.out
     assert "swebench" in captured.out
     assert "osworld" in captured.out
+
+
+def test_cli_main_demo(tmp_path, capsys):
+    db_file = str(tmp_path / "test_demo.sqlite")
+    ret = main(["demo", "--delay", "0.0", "--db", db_file])
+    assert ret == 0
+    captured = capsys.readouterr()
+    assert "TRACE END-TO-END DEMO EXECUTION" in captured.out
+    assert "DEMO COMPLETE" in captured.out
+
+
+def test_cli_interactive_shell_exit(monkeypatch, capsys):
+    from trace.cli.main import interactive_shell, build_parser
+    parser = build_parser()
+    
+    # Simulate user typing "adapter list" then "exit"
+    simulated_inputs = iter(["adapter list", "exit"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(simulated_inputs))
+
+    ret = interactive_shell(parser)
+    assert ret == 0
+    captured = capsys.readouterr()
+    assert "TRACE INTERACTIVE SESSION" in captured.out
+    assert "Registered Framework Adapters" in captured.out
+    assert "Exited TRACE environment" in captured.out
+

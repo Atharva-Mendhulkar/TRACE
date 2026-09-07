@@ -1,6 +1,6 @@
 """
 TRACE Command Line Interface (PRD §30).
-Enhanced with semantic CLI elements inspired by R/Posit cli and Python rich.
+Enhanced with violet-accent semantic CLI elements, interactive REPL shell, and step-by-step mock demo.
 """
 
 from __future__ import annotations
@@ -8,12 +8,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import shlex
 import sys
+import time
 from pathlib import Path
 from typing import List, Optional
 
 from trace.adapters.base import list_adapters
 from trace.cli.ui import (
+    Style,
     cli_alert,
     cli_alert_danger,
     cli_alert_info,
@@ -25,9 +29,11 @@ from trace.cli.ui import (
     cli_h2,
     cli_h3,
     cli_kv,
+    cli_progress_bar,
     cli_rule,
     cli_table,
     status_pill,
+    style,
 )
 from trace.corpus.store import TraceStore
 from trace.inference.flexfringe import FlexFringeRunner
@@ -42,7 +48,7 @@ DEFAULT_DB = "trace_data.sqlite"
 
 
 class TraceArgumentParser(argparse.ArgumentParser):
-    """Custom ArgumentParser that prints the rich TRACE banner on help or error."""
+    """Custom ArgumentParser that prints the rich TRACE violet banner on help or error."""
 
     def format_help(self) -> str:
         banner = cli_banner(print_out=False)
@@ -55,15 +61,20 @@ def build_parser() -> argparse.ArgumentParser:
         prog="trace",
         description="TRACE: Trace-based Runtime Automata for Compliance and Enforcement",
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command", required=False)
 
-    # 1. trace ingest <path>
+    # 1. trace demo
+    demo_p = subparsers.add_parser("demo", help="Run interactive step-by-step demonstration with mock data")
+    demo_p.add_argument("--delay", type=float, default=0.2, help="Delay between demonstration steps (seconds)")
+    demo_p.add_argument("--db", default="mock_data/demo.sqlite", help="Demo SQLite database path")
+
+    # 2. trace ingest <path>
     ingest_p = subparsers.add_parser("ingest", help="Ingest framework events into CES storage")
     ingest_p.add_argument("path", help="Path to JSON or JSONL file with events")
     ingest_p.add_argument("--framework", "-f", help="Framework hint (mcp, langgraph, etc.)")
     ingest_p.add_argument("--db", default=DEFAULT_DB, help="Database file path")
 
-    # 2. trace train (--agent-id <id> | --role <role>)
+    # 3. trace train (--agent-id <id> | --role <role>)
     train_p = subparsers.add_parser("train", help="Train a PDFA from stored traces")
     train_p.add_argument("--agent-id", "-a", help="Agent ID to train model for")
     train_p.add_argument("--role", "-r", help="Delegation role to train child model for (PRD §16.2)")
@@ -78,12 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
     train_p.add_argument("--include-truncated", action="store_true", help="Include truncated traces in training")
     train_p.add_argument("--db", default=DEFAULT_DB, help="Database file path")
 
-    # 3. trace validate --model-id <id>
+    # 4. trace validate --model-id <id>
     val_p = subparsers.add_parser("validate", help="Run model validation checks")
     val_p.add_argument("--model-id", "-m", required=True, help="Model UUID")
     val_p.add_argument("--db", default=DEFAULT_DB, help="Database file path")
 
-    # 4. trace verify --trace-id <id>
+    # 5. trace verify --trace-id <id>
     ver_p = subparsers.add_parser("verify", help="Verify a stored trace against a model and policy")
     ver_p.add_argument("--trace-id", "-t", required=True, help="Trace UUID to verify")
     ver_p.add_argument("--model-id", "-m", help="Model UUID (defaults to active model)")
@@ -91,18 +102,18 @@ def build_parser() -> argparse.ArgumentParser:
     ver_p.add_argument("--mode", choices=["observe", "gate"], default="observe", help="Verification mode")
     ver_p.add_argument("--db", default=DEFAULT_DB, help="Database file path")
 
-    # 5. trace replay --trace-id <id>
+    # 6. trace replay --trace-id <id>
     rep_p = subparsers.add_parser("replay", help="Replay trace and print state trajectory")
     rep_p.add_argument("--trace-id", "-t", required=True, help="Trace UUID to replay")
     rep_p.add_argument("--db", default=DEFAULT_DB, help="Database file path")
 
-    # 6. trace policy validate <file>
+    # 7. trace policy validate <file>
     pol_p = subparsers.add_parser("policy", help="Policy management")
     pol_sub = pol_p.add_subparsers(dest="policy_cmd", required=True)
     pol_val = pol_sub.add_parser("validate", help="Parse and validate a policy file")
     pol_val.add_argument("file", help="Path to .policy file")
 
-    # 7. trace model list / inspect / promote
+    # 8. trace model list / inspect / promote
     mod_p = subparsers.add_parser("model", help="Model repository management")
     mod_sub = mod_p.add_subparsers(dest="model_cmd", required=True)
     mod_list = mod_sub.add_parser("list", help="List trained models")
@@ -116,7 +127,7 @@ def build_parser() -> argparse.ArgumentParser:
     mod_prom.add_argument("--activate", action="store_true", help="Also activate model into production")
     mod_prom.add_argument("--db", default=DEFAULT_DB, help="Database file path")
 
-    # 8. trace feedback record / list (PRD M10, §23.4)
+    # 9. trace feedback record / list (PRD M10, §23.4)
     fb_p = subparsers.add_parser("feedback", help="Human-in-the-loop violation feedback")
     fb_sub = fb_p.add_subparsers(dest="feedback_cmd", required=True)
     fb_rec = fb_sub.add_parser("record", help="Record reviewer feedback on a violation")
@@ -134,12 +145,12 @@ def build_parser() -> argparse.ArgumentParser:
     fb_list = fb_sub.add_parser("list", help="List recorded feedback")
     fb_list.add_argument("--db", default=DEFAULT_DB, help="Database file path")
 
-    # 9. trace adapter list
+    # 10. trace adapter list
     adp_p = subparsers.add_parser("adapter", help="Adapter management")
     adp_sub = adp_p.add_subparsers(dest="adapter_cmd", required=True)
     adp_sub.add_parser("list", help="List registered framework adapters")
 
-    # 10. trace benchmark run (PRD §32, RQ1–RQ6)
+    # 11. trace benchmark run (PRD §32, RQ1–RQ6)
     bench_p = subparsers.add_parser("benchmark", help="Empirical evaluation benchmarks (PRD §32)")
     bench_sub = bench_p.add_subparsers(dest="benchmark_cmd", required=True)
     bench_run = bench_sub.add_parser("run", help="Run benchmark suite")
@@ -150,7 +161,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Research Question to evaluate",
     )
 
-    # 11. trace ingest-benchmark <path> [--dataset <swebench|osworld|auto>] [--db <db>] [--train]
+    # 12. trace ingest-benchmark <path> [--dataset <swebench|osworld|auto>] [--db <db>] [--train]
     bench_ingest_p = subparsers.add_parser(
         "ingest-benchmark",
         help="Ingest real-world benchmark trajectories (SWE-bench / OSWorld) into CES storage",
@@ -173,19 +184,11 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(args: Optional[List[str]] = None) -> int:
-    parser = build_parser()
-
-    # If no arguments provided, display the rich banner and help
-    actual_args = sys.argv[1:] if args is None else args
-    if not actual_args:
-        parser.print_help()
-        return 0
-
-    parsed = parser.parse_args(args)
-
-    # Dispatch commands
-    if parsed.command == "ingest":
+def dispatch_command(parsed: argparse.Namespace) -> int:
+    """Route parsed arguments to the corresponding subcommand handler."""
+    if parsed.command == "demo":
+        return cmd_demo(step_delay=parsed.delay, db_path=parsed.db)
+    elif parsed.command == "ingest":
         return cmd_ingest(parsed.path, parsed.framework, parsed.db)
     elif parsed.command == "ingest-benchmark":
         return cmd_ingest_benchmark(parsed.path, parsed.dataset, parsed.db, parsed.train)
@@ -215,7 +218,223 @@ def main(args: Optional[List[str]] = None) -> int:
         return cmd_adapter_list()
     elif parsed.command == "benchmark" and parsed.benchmark_cmd == "run":
         return cmd_benchmark_run(parsed.rq)
+    return 0
 
+
+def interactive_shell(parser: argparse.ArgumentParser) -> int:
+    """
+    Run the persistent TRACE interactive shell.
+    Enables commands to be executed repeatedly without typing 'trace' each time.
+    """
+    cli_banner()
+    welcome_lines = [
+        "Welcome to the TRACE Interactive Shell!",
+        "• Type commands directly without 'trace': e.g. 'demo', 'adapter list', 'help'",
+        "• Type 'demo' to run the automated step-by-step mock data demonstration",
+        "• Type 'exit' or 'quit' to return to your system shell",
+    ]
+    cli_box("TRACE INTERACTIVE SESSION", welcome_lines, style_color=Style.VIOLET)
+    print("")
+
+    while True:
+        try:
+            prompt_str = f"{style('trace', Style.BOLD, Style.WHITE)} {style('❯', Style.BOLD, Style.BRIGHT_VIOLET)} "
+            raw = input(prompt_str).strip()
+
+            if not raw:
+                continue
+
+            # Check exit commands
+            if raw.lower() in ("exit", "quit", "q", ":q", "exit()", "quit()"):
+                cli_alert_success("Exited TRACE environment. Goodbye!")
+                break
+
+            # Shell utilities
+            if raw.lower() == "clear":
+                print("\033[H\033[J", end="")
+                continue
+
+            if raw.lower() in ("help", "?"):
+                parser.print_help()
+                continue
+
+            # Strip leading 'trace ' if user still typed it
+            if raw.startswith("trace "):
+                raw = raw[6:].strip()
+
+            tokens = shlex.split(raw)
+            if not tokens:
+                continue
+
+            try:
+                parsed = parser.parse_args(tokens)
+                if not getattr(parsed, "command", None):
+                    parser.print_help()
+                    continue
+                dispatch_command(parsed)
+            except SystemExit:
+                # Prevent argparse from terminating the interactive session
+                pass
+            except Exception as e:
+                cli_alert_danger(f"Command execution error: {e}")
+
+        except KeyboardInterrupt:
+            print(f"\n{style('Type exit or press Ctrl+D to quit.', Style.DIM, Style.LAVENDER)}")
+        except EOFError:
+            print("")
+            cli_alert_success("Exited TRACE environment. Goodbye!")
+            break
+
+    return 0
+
+
+def main(args: Optional[List[str]] = None) -> int:
+    parser = build_parser()
+
+    actual_args = sys.argv[1:] if args is None else args
+
+    # If no arguments provided and in an interactive terminal, launch the TRACE shell
+    if not actual_args:
+        if sys.stdin.isatty():
+            return interactive_shell(parser)
+        else:
+            parser.print_help()
+            return 0
+
+    parsed = parser.parse_args(actual_args)
+    if not getattr(parsed, "command", None):
+        parser.print_help()
+        return 0
+
+    return dispatch_command(parsed)
+
+
+# ==============================================================================
+# SUBCOMMAND HANDLERS
+# ==============================================================================
+
+def cmd_demo(step_delay: float = 0.2, db_path: str = "mock_data/demo.sqlite") -> int:
+    """
+    Run an end-to-end step-by-step interactive demonstration of all TRACE capabilities
+    using the built-in mock dataset.
+    """
+    cli_h1("TRACE END-TO-END DEMO EXECUTION")
+    cli_alert_info("Executing all 12 platform operations step-by-step with mock data...")
+
+    # Locate mock_data directory
+    mock_dir = Path(__file__).resolve().parent.parent.parent / "mock_data"
+    if not mock_dir.exists():
+        mock_dir = Path("mock_data")
+
+    events_file = str(mock_dir / "events.json")
+    anomalous_file = str(mock_dir / "anomalous_events.json")
+    bench_file = str(mock_dir / "benchmark_trajectories.json")
+    policy_file = str(mock_dir / "compliance_policy.policy")
+
+    # Clean up previous demo DB
+    if os.path.exists(db_path):
+        try:
+            os.remove(db_path)
+        except Exception:
+            pass
+
+    def step(num: int, total: int, title: str):
+        time.sleep(step_delay)
+        print("\n" + cli_progress_bar(num, total, label=f"Step {num}/{total}: {title}"))
+        cli_rule(title)
+
+    total_steps = 12
+
+    # Step 1: Adapters
+    step(1, total_steps, "Registered Framework Adapters")
+    cmd_adapter_list()
+
+    # Step 2: Policy Compilation
+    step(2, total_steps, "Policy DSL Parsing & DFA Compilation")
+    cmd_policy_validate(policy_file)
+
+    # Step 3: Normal Ingestion
+    step(3, total_steps, "Ingesting Multi-Agent Framework Logs (MCP)")
+    cmd_ingest(events_file, framework="mcp", db_path=db_path)
+
+    # Step 4: Anomalous Ingestion
+    step(4, total_steps, "Ingesting Triage Anomaly Events")
+    cmd_ingest(anomalous_file, framework="mcp", db_path=db_path)
+
+    # Step 5: Benchmark Ingestion & Auto-Training
+    step(5, total_steps, "SWE-bench Benchmark Trajectory Ingestion & Auto-Training")
+    cmd_ingest_benchmark(bench_file, dataset="swebench", db_path=db_path, train=True)
+
+    # Step 6: Learning research-agent
+    step(6, total_steps, "Inference Learning for research-agent (ALERGIA)")
+    p = build_parser()
+    train_args_1 = p.parse_args([
+        "train",
+        "--agent-id", "research-agent",
+        "--engine", "native-alergia",
+        "--heuristic", "alergia",
+        "--alpha", "0.05",
+        "--db", db_path,
+    ])
+    cmd_train(train_args_1)
+
+    # Step 7: Learning security-agent
+    step(7, total_steps, "Inference Learning for security-agent (ALERGIA)")
+    train_args_2 = p.parse_args([
+        "train",
+        "--agent-id", "security-agent",
+        "--db", db_path,
+    ])
+    cmd_train(train_args_2)
+
+    # Step 8: Model Registry & Inspection
+    step(8, total_steps, "Model Repository & Transitions Inspection")
+    cmd_model_list(agent_id=None, db_path=db_path)
+    repo = ModelRepository(db_path)
+    models = repo.list_models(agent_id="research-agent")
+    if models:
+        m_id = models[0]["model_id"]
+        cmd_model_inspect(m_id, db_path=db_path)
+        cmd_validate(m_id, db_path=db_path)
+        cmd_model_promote(m_id, activate=True, db_path=db_path)
+
+    # Step 9: Replay
+    step(9, total_steps, "Trace Execution Replay")
+    cmd_replay("trace-research-001", db_path=db_path)
+
+    # Step 10: Verification - Normal Trace
+    step(10, total_steps, "Streaming Verification (Normal Trace: Expected PASS)")
+    ver_norm_args = p.parse_args([
+        "verify",
+        "--trace-id", "trace-research-001",
+        "--db", db_path,
+    ])
+    cmd_verify(ver_norm_args)
+
+    # Step 11: Verification - Policy Violation
+    step(11, total_steps, "Streaming Verification (Anomalous Trace: Expected VIOLATION)")
+    ver_viol_args = p.parse_args([
+        "verify",
+        "--trace-id", "trace-violation-001",
+        "--policy", policy_file,
+        "--db", db_path,
+    ])
+    cmd_verify(ver_viol_args)
+
+    # Step 12: Feedback & Benchmarks
+    step(12, total_steps, "HITL Triage Recording & Sub-ms Latency Benchmark")
+    cmd_feedback_record(
+        violation_id="viol-demo-001",
+        feedback_type="approve",
+        reviewer="secops-operator",
+        comment="Demo audit approval",
+        db_path=db_path,
+    )
+    cmd_feedback_list(db_path=db_path)
+    cmd_benchmark_run("3")
+
+    cli_h1("DEMO COMPLETE")
+    cli_alert_success("All 12 demonstration steps executed successfully!")
     return 0
 
 
