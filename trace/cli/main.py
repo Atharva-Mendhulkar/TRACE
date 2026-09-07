@@ -65,7 +65,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # 1. trace demo
     demo_p = subparsers.add_parser("demo", help="Run interactive step-by-step demonstration with mock data")
-    demo_p.add_argument("--delay", type=float, default=0.2, help="Delay between demonstration steps (seconds)")
+    demo_p.add_argument("--auto", action="store_true", help="Run automatically without waiting for keypress")
+    demo_p.add_argument("--delay", type=float, default=0.1, help="Delay between demonstration steps (seconds)")
     demo_p.add_argument("--db", default="mock_data/demo.sqlite", help="Demo SQLite database path")
 
     # 2. trace ingest <path>
@@ -187,7 +188,7 @@ def build_parser() -> argparse.ArgumentParser:
 def dispatch_command(parsed: argparse.Namespace) -> int:
     """Route parsed arguments to the corresponding subcommand handler."""
     if parsed.command == "demo":
-        return cmd_demo(step_delay=parsed.delay, db_path=parsed.db)
+        return cmd_demo(auto=getattr(parsed, "auto", False), step_delay=parsed.delay, db_path=parsed.db)
     elif parsed.command == "ingest":
         return cmd_ingest(parsed.path, parsed.framework, parsed.db)
     elif parsed.command == "ingest-benchmark":
@@ -313,13 +314,13 @@ def main(args: Optional[List[str]] = None) -> int:
 # SUBCOMMAND HANDLERS
 # ==============================================================================
 
-def cmd_demo(step_delay: float = 0.2, db_path: str = "mock_data/demo.sqlite") -> int:
+def cmd_demo(auto: bool = False, step_delay: float = 0.1, db_path: str = "mock_data/demo.sqlite") -> int:
     """
-    Run an end-to-end step-by-step interactive demonstration of all TRACE capabilities
-    using the built-in mock dataset.
+    Run an end-to-end interactive demonstration of all TRACE capabilities step-by-step.
+    In interactive mode, the user presses [Enter] to advance each test.
     """
-    cli_h1("TRACE END-TO-END DEMO EXECUTION")
-    cli_alert_info("Executing all 12 platform operations step-by-step with mock data...")
+    cli_h1("TRACE COMPLETE CAPABILITIES DEMONSTRATION")
+    cli_alert_info("Executing all 14 platform operations step-by-step with mock data...")
 
     # Locate mock_data directory
     mock_dir = Path(__file__).resolve().parent.parent.parent / "mock_data"
@@ -338,36 +339,60 @@ def cmd_demo(step_delay: float = 0.2, db_path: str = "mock_data/demo.sqlite") ->
         except Exception:
             pass
 
-    def step(num: int, total: int, title: str):
+    auto_run = auto or not sys.stdin.isatty()
+    total_steps = 14
+
+    def wait_step(num: int, title: str, description: str) -> bool:
+        nonlocal auto_run
         time.sleep(step_delay)
-        print("\n" + cli_progress_bar(num, total, label=f"Step {num}/{total}: {title}"))
-        cli_rule(title)
+        print("\n" + cli_progress_bar(num, total_steps, label=f"Step {num}/{total_steps}"))
+        cli_box(f"TEST {num}/{total_steps}: {title.upper()}", [description], style_color=Style.VIOLET)
 
-    total_steps = 12
+        if not auto_run and sys.stdin.isatty():
+            prompt_str = f"  {style('❯', Style.BOLD, Style.BRIGHT_VIOLET)} Press {style('[Enter]', Style.BOLD, Style.WHITE)} to run this step {style('(or \"a\" for auto-play, \"q\" to exit)', Style.DIM, Style.LAVENDER)}: "
+            try:
+                ans = input(prompt_str).strip().lower()
+                if ans == "q":
+                    cli_alert_warning("Demo halted by operator.")
+                    return False
+                elif ans == "a":
+                    auto_run = True
+            except (KeyboardInterrupt, EOFError):
+                print("")
+                cli_alert_warning("Demo cancelled.")
+                return False
+        return True
 
-    # Step 1: Adapters
-    step(1, total_steps, "Registered Framework Adapters")
+    p = build_parser()
+
+    # Step 1: Adapters Registry
+    if not wait_step(1, "Framework Adapter Registry", "Verify all 9 heterogeneous framework and benchmark adapters are active."):
+        return 0
     cmd_adapter_list()
 
-    # Step 2: Policy Compilation
-    step(2, total_steps, "Policy DSL Parsing & DFA Compilation")
+    # Step 2: Policy DSL Compilation
+    if not wait_step(2, "Declarative Policy DSL & DFA Compilation", "Parse and compile temporal safety rules (REQUIRE, FORBID SEQUENCE, LIMIT) into a minimal DFA."):
+        return 0
     cmd_policy_validate(policy_file)
 
-    # Step 3: Normal Ingestion
-    step(3, total_steps, "Ingesting Multi-Agent Framework Logs (MCP)")
+    # Step 3: Multi-Agent Event Ingestion
+    if not wait_step(3, "Canonical Event Schema (CES v1.0) Normalization", "Ingest multi-agent MCP JSON-RPC events with schema validation and secret redaction."):
+        return 0
     cmd_ingest(events_file, framework="mcp", db_path=db_path)
 
-    # Step 4: Anomalous Ingestion
-    step(4, total_steps, "Ingesting Triage Anomaly Events")
+    # Step 4: Anomalous Events Ingestion
+    if not wait_step(4, "Ingesting Policy-Violating Anomaly Events", "Ingest anomalous execution traces for runtime violation detection and explainability diffing."):
+        return 0
     cmd_ingest(anomalous_file, framework="mcp", db_path=db_path)
 
-    # Step 5: Benchmark Ingestion & Auto-Training
-    step(5, total_steps, "SWE-bench Benchmark Trajectory Ingestion & Auto-Training")
+    # Step 5: Real-World Benchmark Trajectory Ingestion
+    if not wait_step(5, "SWE-bench Benchmark Trajectory Ingestion & Auto-Training", "Normalize SWE-bench agent trajectories and automatically infer initial protocol automata."):
+        return 0
     cmd_ingest_benchmark(bench_file, dataset="swebench", db_path=db_path, train=True)
 
-    # Step 6: Learning research-agent
-    step(6, total_steps, "Inference Learning for research-agent (ALERGIA)")
-    p = build_parser()
+    # Step 6: Protocol Inference (research-agent)
+    if not wait_step(6, "Positive-Only Automata Learning (ALERGIA / MDI)", "Construct Prefix Tree Acceptor (PTA) and apply Hoeffding bounds (α=0.05) state merging on research-agent."):
+        return 0
     train_args_1 = p.parse_args([
         "train",
         "--agent-id", "research-agent",
@@ -378,8 +403,9 @@ def cmd_demo(step_delay: float = 0.2, db_path: str = "mock_data/demo.sqlite") ->
     ])
     cmd_train(train_args_1)
 
-    # Step 7: Learning security-agent
-    step(7, total_steps, "Inference Learning for security-agent (ALERGIA)")
+    # Step 7: Protocol Inference (security-agent)
+    if not wait_step(7, "Multi-Agent Protocol Learning (security-agent)", "Infer behavioral protocol automaton for security-agent enforcing auth checks."):
+        return 0
     train_args_2 = p.parse_args([
         "train",
         "--agent-id", "security-agent",
@@ -387,23 +413,31 @@ def cmd_demo(step_delay: float = 0.2, db_path: str = "mock_data/demo.sqlite") ->
     ])
     cmd_train(train_args_2)
 
-    # Step 8: Model Registry & Inspection
-    step(8, total_steps, "Model Repository & Transitions Inspection")
+    # Step 8: Model Repository Inspection
+    if not wait_step(8, "Model Repository & Transition Matrix Inspection", "Query learned models and inspect probabilistic transition matrices (δ, P, n)."):
+        return 0
     cmd_model_list(agent_id=None, db_path=db_path)
     repo = ModelRepository(db_path)
     models = repo.list_models(agent_id="research-agent")
-    if models:
-        m_id = models[0]["model_id"]
+    m_id = models[0]["model_id"] if models else None
+    if m_id:
         cmd_model_inspect(m_id, db_path=db_path)
+
+    # Step 9: Stochastic Invariants Validation & Promotion
+    if not wait_step(9, "Automata Validation & Model Promotion", "Validate connectedness and stochastic sums (∑P=1.0), then promote candidate model to ACTIVE."):
+        return 0
+    if m_id:
         cmd_validate(m_id, db_path=db_path)
         cmd_model_promote(m_id, activate=True, db_path=db_path)
 
-    # Step 9: Replay
-    step(9, total_steps, "Trace Execution Replay")
+    # Step 10: Trace Trajectory Replay
+    if not wait_step(10, "Trace Trajectory Replay", "Replay stored trace events resolving native actions to canonical symbols."):
+        return 0
     cmd_replay("trace-research-001", db_path=db_path)
 
-    # Step 10: Verification - Normal Trace
-    step(10, total_steps, "Streaming Verification (Normal Trace: Expected PASS)")
+    # Step 11: Dual-Control Verification (Conforming Trace)
+    if not wait_step(11, "Dual-Control Streaming Verification (Conforming Trace)", "Verify conforming trace against learned PDFA and policy DFA. Expected: PASSED."):
+        return 0
     ver_norm_args = p.parse_args([
         "verify",
         "--trace-id", "trace-research-001",
@@ -411,8 +445,9 @@ def cmd_demo(step_delay: float = 0.2, db_path: str = "mock_data/demo.sqlite") ->
     ])
     cmd_verify(ver_norm_args)
 
-    # Step 11: Verification - Policy Violation
-    step(11, total_steps, "Streaming Verification (Anomalous Trace: Expected VIOLATION)")
+    # Step 12: Safety Policy Violation & Explanations
+    if not wait_step(12, "Safety Policy Violation Detection & Counterexample", "Verify anomalous trace violating REQUIRE auth_check BEFORE scan_network. Expected: VIOLATION."):
+        return 0
     ver_viol_args = p.parse_args([
         "verify",
         "--trace-id", "trace-violation-001",
@@ -421,20 +456,45 @@ def cmd_demo(step_delay: float = 0.2, db_path: str = "mock_data/demo.sqlite") ->
     ])
     cmd_verify(ver_viol_args)
 
-    # Step 12: Feedback & Benchmarks
-    step(12, total_steps, "HITL Triage Recording & Sub-ms Latency Benchmark")
+    # Step 13: Behavioral Concept Drift Detection
+    if not wait_step(13, "Behavioral Concept Drift Detection (Two-Sample KS Test)", "Evaluate running NLL against baseline distribution using two-sample KS test and tail-quantile CUSUM."):
+        return 0
+    from trace.drift.detector import DriftDetector
+    dd = DriftDetector(agent_id="research-agent", window_size=10, min_sample_size=5)
+    dd.set_baseline([0.15, 0.18, 0.14, 0.16, 0.15, 0.17])
+    drift_event = None
+    for s in [0.85, 0.92, 0.88, 0.95, 0.91]:
+        res = dd.record_trace_conformance(s)
+        if res:
+            drift_event = res
+    if drift_event:
+        cli_alert_warning(f"Drift alert detected: KS Statistic = {drift_event.statistic:.4f}, p-value = {drift_event.p_value:.4e}")
+        cli_table(["Drift Property", "Value"], [
+            ["Agent Target", drift_event.agent_id],
+            ["Statistical Test", drift_event.test_used],
+            ["KS Statistic", f"{drift_event.statistic:.4f}"],
+            ["p-value", f"{drift_event.p_value:.6e}"],
+            ["Severity", drift_event.severity],
+            ["Relearn Triggered", "✔ YES" if drift_event.relearn_triggered else "NO"],
+        ])
+    else:
+        cli_alert_info("No drift detected within sample window.")
+
+    # Step 14: HITL Feedback & Latency Benchmark
+    if not wait_step(14, "HITL Triage Recording & Sub-ms Latency Benchmark (RQ3)", "Record operator review decision and run empirical latency verification benchmark (<5ms budget)."):
+        return 0
     cmd_feedback_record(
         violation_id="viol-demo-001",
         feedback_type="approve",
-        reviewer="secops-operator",
-        comment="Demo audit approval",
+        reviewer="secops-lead",
+        comment="Authorized penetration testing exception",
         db_path=db_path,
     )
     cmd_feedback_list(db_path=db_path)
     cmd_benchmark_run("3")
 
     cli_h1("DEMO COMPLETE")
-    cli_alert_success("All 12 demonstration steps executed successfully!")
+    cli_alert_success("All 14 platform capability tests executed successfully!")
     return 0
 
 

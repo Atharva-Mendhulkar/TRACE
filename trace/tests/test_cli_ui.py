@@ -125,7 +125,7 @@ def test_cli_main_demo(tmp_path, capsys):
     ret = main(["demo", "--delay", "0.0", "--db", db_file])
     assert ret == 0
     captured = capsys.readouterr()
-    assert "TRACE END-TO-END DEMO EXECUTION" in captured.out
+    assert "TRACE COMPLETE CAPABILITIES DEMONSTRATION" in captured.out
     assert "DEMO COMPLETE" in captured.out
 
 
