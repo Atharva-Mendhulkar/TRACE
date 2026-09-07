@@ -1,0 +1,6 @@
+policy reviewer_safety {
+    alphabet: [receive, inspect, tool_call, return, delete_record]
+    never {
+        delete_record
+    }
+}

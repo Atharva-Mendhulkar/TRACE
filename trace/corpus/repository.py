@@ -40,3 +40,16 @@ class TraceRepository(Protocol):
     ) -> List[List[str]]:
         """Return complete symbolic traces over alphabet Sigma for training."""
         ...
+
+    def get_role_corpus(
+        self,
+        role: str,
+        include_truncated: bool = False,
+        taxonomy_version: int = 1,
+    ) -> List[List[str]]:
+        """Return symbolic traces for a delegated role across all parent traces (PRD §16.2)."""
+        ...
+
+    def get_delegated_traces(self, parent_span_id: str) -> List[CESRecord]:
+        """Fetch child events belonging to a specific parent delegation span (PRD §16.2)."""
+        ...

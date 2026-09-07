@@ -56,6 +56,22 @@ class CounterexampleExplanation:
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
+    def render_human_readable(self) -> str:
+        ctx_str = ""
+        if self.delegation_context.depth > 0 or self.delegation_context.role:
+            ctx_str = (
+                f" [Delegation depth={self.delegation_context.depth}, "
+                f"role='{self.delegation_context.role or 'unknown'}', "
+                f"parent_span='{self.delegation_context.parent_span_id}']"
+            )
+        rule_str = f" Rule: {self.policy_rule_if_applicable}." if self.policy_rule_if_applicable else ""
+        return (
+            f"VIOLATION [{', '.join(self.classification)}]{ctx_str}:{rule_str} "
+            f"Observed '{self.observed_symbol}' at state '{self.previous_known_good_state.state_id}'. "
+            f"Expected one of: {self.expected_symbols_at_state}. "
+            f"Offending suffix: {' -> '.join(self.shortest_offending_suffix)}"
+        )
+
 
 class CounterexampleExplainer:
     """Generates human-readable, schema-valid counterexample explanations (PRD §21.2)."""

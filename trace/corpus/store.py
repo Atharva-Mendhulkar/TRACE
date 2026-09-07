@@ -164,6 +164,49 @@ class TraceStore:
 
         return corpus
 
+    def get_role_corpus(
+        self,
+        role: str,
+        include_truncated: bool = False,
+        taxonomy_version: int = 1,
+    ) -> List[List[str]]:
+        """Return list of symbolic traces for a delegated role across all traces (PRD §16.2)."""
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT DISTINCT trace_id, span_id FROM events WHERE role = ? AND (depth > 0 OR parent_span_id IS NOT NULL)",
+                (role,)
+            )
+            spans = cur.fetchall()
+
+        corpus: List[List[str]] = []
+        for row in spans:
+            t_id, s_id = row[0], row[1]
+            events = self.get_trace(t_id, span_id=s_id)
+            if not events:
+                continue
+            if not include_truncated:
+                has_end = any(
+                    e.event_type in ("terminate", "return") or e.symbol in ("return", "terminate")
+                    for e in events
+                )
+                if not has_end:
+                    continue
+            symbolic_trace = [e.symbol for e in events]
+            if symbolic_trace:
+                corpus.append(symbolic_trace)
+        return corpus
+
+    def get_delegated_traces(self, parent_span_id: str) -> List[CESRecord]:
+        """Fetch child events belonging to a specific parent delegation span (PRD §16.2)."""
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT * FROM events WHERE parent_span_id = ? ORDER BY sequence_no ASC",
+                (parent_span_id,)
+            )
+            return [self._row_to_record(row) for row in cur.fetchall()]
+
     def _row_to_record(self, row: sqlite3.Row) -> CESRecord:
         error = None
         if row["error_class"]:

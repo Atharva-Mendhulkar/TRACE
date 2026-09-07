@@ -19,7 +19,7 @@ from trace.ingestion.pipeline import IngestionPipeline
 from trace.models.repository import ModelRepository
 from trace.policy.compiler import PolicyCompiler
 from trace.policy.dsl import PolicyParser
-from trace.verification.verifier import RuntimeVerifier
+from trace.verification.verifier import HierarchicalRuntimeVerifier, RuntimeVerifier
 
 DEFAULT_DB = "trace_data.sqlite"
 
@@ -37,9 +37,10 @@ def main(args: Optional[List[str]] = None) -> int:
     ingest_p.add_argument("--framework", "-f", help="Framework hint (mcp, langgraph, etc.)")
     ingest_p.add_argument("--db", default=DEFAULT_DB, help="Database file path")
 
-    # 2. trace train --agent-id <id>
+    # 2. trace train (--agent-id <id> | --role <role>)
     train_p = subparsers.add_parser("train", help="Train a PDFA from stored traces")
-    train_p.add_argument("--agent-id", "-a", required=True, help="Agent ID to train model for")
+    train_p.add_argument("--agent-id", "-a", help="Agent ID to train model for")
+    train_p.add_argument("--role", "-r", help="Delegation role to train child model for (PRD §16.2)")
     train_p.add_argument(
         "--engine",
         choices=["native", "native-alergia", "native-edsm", "native-rpni", "flexfringe"],
@@ -139,12 +140,23 @@ def cmd_train(parsed: argparse.Namespace) -> int:
     store = TraceStore(parsed.db)
     repo = ModelRepository(parsed.db)
 
-    corpus = store.get_corpus(parsed.agent_id, include_truncated=parsed.include_truncated)
-    if not corpus:
-        print(f"No complete traces found for agent '{parsed.agent_id}' in {parsed.db}", file=sys.stderr)
+    if parsed.role:
+        corpus = store.get_role_corpus(parsed.role, include_truncated=parsed.include_truncated)
+        target_name = f"role '{parsed.role}'"
+        target_id = f"role:{parsed.role}"
+    elif parsed.agent_id:
+        corpus = store.get_corpus(parsed.agent_id, include_truncated=parsed.include_truncated)
+        target_name = f"agent '{parsed.agent_id}'"
+        target_id = parsed.agent_id
+    else:
+        print("Error: Either --agent-id or --role must be specified for training.", file=sys.stderr)
         return 1
 
-    print(f"Loaded {len(corpus)} traces for training.")
+    if not corpus:
+        print(f"No traces found for {target_name} in {parsed.db}", file=sys.stderr)
+        return 1
+
+    print(f"Loaded {len(corpus)} traces for training {target_name}.")
     corpus_hash = hashlib.sha256(json.dumps(corpus, sort_keys=True).encode()).hexdigest()
 
     # Train via selected engine
@@ -165,9 +177,11 @@ def cmd_train(parsed: argparse.Namespace) -> int:
         "heuristic": parsed.heuristic,
         "alpha": parsed.alpha,
         "include_truncated": parsed.include_truncated,
+        "role": parsed.role,
     }
     model_id = repo.save_model(
-        agent_id=parsed.agent_id,
+        agent_id=target_id,
+        role=parsed.role,
         pdfa=pdfa,
         training_corpus_hash=corpus_hash,
         learner_config=config,
@@ -175,6 +189,7 @@ def cmd_train(parsed: argparse.Namespace) -> int:
 
     print(f"Model trained successfully!")
     print(f"  Model ID:     {model_id}")
+    print(f"  Target:       {target_name}")
     print(f"  States:       {len(pdfa.states)}")
     print(f"  Transitions:  {len(pdfa.delta)}")
     print(f"  Alphabet:     {sorted(list(pdfa.alphabet))}")
@@ -225,15 +240,23 @@ def cmd_verify(parsed: argparse.Namespace) -> int:
         ast = PolicyParser.parse(Path(parsed.policy).read_text(encoding="utf-8"))
         policy_dfa = PolicyCompiler.compile(ast, alphabet=pdfa.alphabet)
 
-    verifier = RuntimeVerifier(
-        pdfa=pdfa,
-        policy_dfa=policy_dfa,
+    def role_resolver(role_name: str) -> Optional[PDFA]:
+        m = repo.get_active_model_for_role(role_name)
+        return m["pdfa"] if m else None
+
+    verifier = HierarchicalRuntimeVerifier(
+        parent_pdfa=pdfa,
+        role_pdfa_resolver=role_resolver,
+        parent_policy_dfa=policy_dfa,
         mode=parsed.mode,
         model_version=f"v{model_dict['model_version']}",
     )
 
     responses = verifier.replay_trace(events)
-    violations = [r for r in responses if r.violation is not None]
+    violations = [
+        r for r in responses
+        if r.violation is not None or "missing_child_trace" in r.classification
+    ]
 
     print(f"Verification Results for Trace {parsed.trace_id}:")
     print(f"  Events Evaluated: {len(responses)}")
@@ -245,10 +268,14 @@ def cmd_verify(parsed: argparse.Namespace) -> int:
         for v in violations:
             expl = v.violation
             if expl:
-                print(f"  - Event: {expl.event_id} | Classifications: {expl.classification}")
+                print(f"  - Event: {expl.event_id} | Classifications: {v.classification}")
                 print(f"    Observed: {expl.observed_symbol} | Expected at {expl.previous_known_good_state.state_id}: {expl.expected_symbols_at_state}")
+                if expl.delegation_context.depth > 0 or expl.delegation_context.role:
+                    print(f"    Delegation: depth={expl.delegation_context.depth}, role='{expl.delegation_context.role}', parent_span='{expl.delegation_context.parent_span_id}'")
                 if expl.policy_rule_if_applicable:
                     print(f"    Policy Rule Broken: {expl.policy_rule_if_applicable}")
+            else:
+                print(f"  - Event: {v.event_id} | Classifications: {v.classification}")
         return 1
     return 0
 

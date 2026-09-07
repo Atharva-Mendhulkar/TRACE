@@ -57,6 +57,10 @@ class RuleBasedAbstraction:
         cleaned = raw_symbol.strip().lower()
 
         # Check delegate patterns
+        if event_type == "delegate":
+            if cleaned.startswith("delegate(") and cleaned.endswith(")"):
+                return cleaned
+            return f"delegate({cleaned})"
         if cleaned.startswith("delegate(") and cleaned.endswith(")"):
             return cleaned
 

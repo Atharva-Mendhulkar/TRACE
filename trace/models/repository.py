@@ -49,6 +49,7 @@ class ModelRepository:
                 model_id TEXT PRIMARY KEY,
                 model_version INTEGER NOT NULL,
                 agent_id TEXT NOT NULL,
+                role TEXT,
                 taxonomy_version INTEGER NOT NULL DEFAULT 1,
                 training_corpus_hash TEXT NOT NULL,
                 learner_config TEXT NOT NULL,
@@ -64,7 +65,13 @@ class ModelRepository:
 
             CREATE INDEX IF NOT EXISTS idx_models_agent_status 
                 ON models (agent_id, status);
+            CREATE INDEX IF NOT EXISTS idx_models_role_status 
+                ON models (role, status);
             """)
+            try:
+                conn.execute("ALTER TABLE models ADD COLUMN role TEXT")
+            except sqlite3.OperationalError:
+                pass
 
     def save_model(
         self,
@@ -74,6 +81,7 @@ class ModelRepository:
         learner_config: Dict[str, Any],
         creator: str = "system",
         taxonomy_version: int = 1,
+        role: Optional[str] = None,
     ) -> str:
         """Store a newly trained PDFA in VALIDATION status."""
         model_id = str(uuid4())
@@ -92,12 +100,12 @@ class ModelRepository:
 
             cur.execute("""
                 INSERT INTO models (
-                    model_id, model_version, agent_id, taxonomy_version,
+                    model_id, model_version, agent_id, role, taxonomy_version,
                     training_corpus_hash, learner_config, status,
                     creator, pdfa_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, 'VALIDATION', ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'VALIDATION', ?, ?, ?)
             """, (
-                model_id, model_version, agent_id, taxonomy_version,
+                model_id, model_version, agent_id, role, taxonomy_version,
                 training_corpus_hash, learner_json, creator, pdfa_json, now
             ))
             conn.commit()
@@ -243,6 +251,23 @@ class ModelRepository:
             row = cur.fetchone()
             return self._row_to_model_dict(row) if row else None
 
+    def get_active_model_for_role(self, role: str) -> Optional[Dict[str, Any]]:
+        """Return active or promoted model for a delegated role (PRD §16.2)."""
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT * FROM models WHERE role = ? AND status = 'ACTIVE' ORDER BY model_version DESC LIMIT 1",
+                (role,)
+            )
+            row = cur.fetchone()
+            if not row:
+                cur.execute(
+                    "SELECT * FROM models WHERE role = ? AND status IN ('PROMOTED', 'CANDIDATE') ORDER BY model_version DESC LIMIT 1",
+                    (role,)
+                )
+                row = cur.fetchone()
+            return self._row_to_model_dict(row) if row else None
+
     def get_model(self, model_id: str) -> Optional[Dict[str, Any]]:
         with self._get_conn() as conn:
             cur = conn.cursor()
@@ -250,7 +275,12 @@ class ModelRepository:
             row = cur.fetchone()
             return self._row_to_model_dict(row) if row else None
 
-    def list_models(self, agent_id: Optional[str] = None, status: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_models(
+        self,
+        agent_id: Optional[str] = None,
+        role: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
             cur = conn.cursor()
             query = "SELECT * FROM models WHERE 1=1"
@@ -258,6 +288,9 @@ class ModelRepository:
             if agent_id:
                 query += " AND agent_id = ?"
                 params.append(agent_id)
+            if role:
+                query += " AND role = ?"
+                params.append(role)
             if status:
                 query += " AND status = ?"
                 params.append(status)
@@ -270,10 +303,12 @@ class ModelRepository:
         pdfa = PDFA.from_dict(pdfa_data)
         metrics = json.loads(row["evaluation_metrics"]) if row["evaluation_metrics"] else {}
         config = json.loads(row["learner_config"]) if row["learner_config"] else {}
+        role = row["role"] if "role" in row.keys() else None
         return {
             "model_id": row["model_id"],
             "model_version": row["model_version"],
             "agent_id": row["agent_id"],
+            "role": role,
             "taxonomy_version": row["taxonomy_version"],
             "training_corpus_hash": row["training_corpus_hash"],
             "learner_config": config,
