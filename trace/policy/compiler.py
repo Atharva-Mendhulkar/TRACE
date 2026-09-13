@@ -3,9 +3,9 @@ Policy Compiler to DFA with Bounded-Counter Construction and Static Checks (PRD 
 """
 
 from __future__ import annotations
+from typing import Dict, List, Optional, Set, Tuple
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
 
 from trace.policy.dsl import (
     ForbidSequenceRule,
@@ -120,8 +120,7 @@ class PolicyCompiler:
 
                     # Any other event increments counter
                     if c < k:
-                        s_next = f"p_c{c + 1}"
-                        # Wildcard fallback for elapsed counter
+                        pass  # Wildcard fallback for elapsed counter
                     else:
                         # Exceeded k events -> expires back to p0
                         pass

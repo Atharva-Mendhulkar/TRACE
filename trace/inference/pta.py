@@ -3,8 +3,8 @@ Prefix Tree Acceptor (PTA) Construction (PRD §14.2).
 """
 
 from __future__ import annotations
+from typing import Dict, List, Tuple
 
-from typing import Dict, List, Set, Tuple
 from trace.models.pdfa import PDFA
 
 

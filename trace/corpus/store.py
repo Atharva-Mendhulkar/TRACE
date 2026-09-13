@@ -3,17 +3,16 @@ Durable Trace Store & Corpus Manager (PRD §13, §29).
 """
 
 from __future__ import annotations
+from typing import List, Optional, Union
 
-import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 
 from trace.schema.models import CESRecord, EventAttributes, ErrorInfo, ProvenanceInfo
 
 
 class TraceStore:
-    """SQLite-backed implementation of M3 Trace Store conforming to TraceRepository."""
+    """SQLite-backed trace store."""
 
     def __init__(self, db_path: Union[str, Path] = ":memory:"):
         self.db_path = str(db_path)
@@ -146,7 +145,6 @@ class TraceStore:
         self,
         agent_id: str,
         include_truncated: bool = False,
-        taxonomy_version: int = 1,
     ) -> List[List[str]]:
         """Return list of symbolic traces over alphabet Sigma (PRD §13.2, §13.4)."""
         trace_ids = self.get_all_trace_ids(agent_id=agent_id)
@@ -168,7 +166,6 @@ class TraceStore:
         self,
         role: str,
         include_truncated: bool = False,
-        taxonomy_version: int = 1,
     ) -> List[List[str]]:
         """Return list of symbolic traces for a delegated role across all traces (PRD §16.2)."""
         with self._get_conn() as conn:
@@ -244,7 +241,4 @@ class TraceStore:
             ),
         )
 
-
-# Alias for explicit repository interface conformance
-SQLiteTraceRepository = TraceStore
 

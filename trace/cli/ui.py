@@ -6,13 +6,11 @@ Provides semantic elements: banners, headings, alerts, rules, boxes, tables, and
 """
 
 from __future__ import annotations
+from typing import Any, List, Optional, Sequence
 
 import os
 import re
 import sys
-from typing import Any, Dict, List, Optional, Sequence, Tuple
-
-
 # ANSI Color & Style Sequences
 class Style:
     RESET = "\033[0m"
@@ -138,53 +136,48 @@ def cli_banner(version: str = "1.0.0", print_out: bool = True) -> str:
 
 
 # Semantic Alert Messages
-def cli_alert_success(text: str, print_out: bool = True) -> str:
-    """Success alert message with a bright green checkmark."""
-    prefix = style("✔", Style.BOLD, Style.BRIGHT_GREEN)
-    content = style(text, Style.GREEN)
+_ALERT_STYLES = {
+    "success": ("✔", Style.BOLD, Style.BRIGHT_GREEN, Style.GREEN, "stdout"),
+    "info": ("ℹ", Style.BOLD, Style.BRIGHT_VIOLET, Style.WHITE, "stdout"),
+    "warning": ("▲", Style.BOLD, Style.BRIGHT_YELLOW, Style.YELLOW, "stdout"),
+    "danger": ("✖", Style.BOLD, Style.BRIGHT_RED, Style.BRIGHT_RED, "stderr"),
+    "generic": ("•", Style.BOLD, Style.VIOLET, None, "stdout"),
+}
+
+
+def _cli_alert(kind: str, text: str, print_out: bool = True) -> str:
+    glyph, s1, s2, s3, stream_name = _ALERT_STYLES[kind]
+    prefix = style(glyph, s1, s2)
+    content = style(text, s3) if s3 else text
     line = f"{prefix}  {content}"
     if print_out:
-        print(line)
+        print(line, file=getattr(sys, stream_name))
     return line
+
+
+def cli_alert_success(text: str, print_out: bool = True) -> str:
+    """Success alert message with a bright green checkmark."""
+    return _cli_alert("success", text, print_out)
 
 
 def cli_alert_info(text: str, print_out: bool = True) -> str:
     """Informational alert message with a radiant violet glyph."""
-    prefix = style("ℹ", Style.BOLD, Style.BRIGHT_VIOLET)
-    content = style(text, Style.WHITE)
-    line = f"{prefix}  {content}"
-    if print_out:
-        print(line)
-    return line
+    return _cli_alert("info", text, print_out)
 
 
 def cli_alert_warning(text: str, print_out: bool = True) -> str:
     """Warning alert message with a yellow warning glyph."""
-    prefix = style("▲", Style.BOLD, Style.BRIGHT_YELLOW)
-    content = style(text, Style.YELLOW)
-    line = f"{prefix}  {content}"
-    if print_out:
-        print(line)
-    return line
+    return _cli_alert("warning", text, print_out)
 
 
 def cli_alert_danger(text: str, print_out: bool = True) -> str:
     """Danger / Error alert message with a red cross."""
-    prefix = style("✖", Style.BOLD, Style.BRIGHT_RED)
-    content = style(text, Style.BRIGHT_RED)
-    line = f"{prefix}  {content}"
-    if print_out:
-        print(line, file=sys.stderr)
-    return line
+    return _cli_alert("danger", text, print_out)
 
 
 def cli_alert(text: str, print_out: bool = True) -> str:
     """Generic bulleted alert message with a violet bullet."""
-    prefix = style("•", Style.BOLD, Style.VIOLET)
-    line = f"{prefix}  {text}"
-    if print_out:
-        print(line)
-    return line
+    return _cli_alert("generic", text, print_out)
 
 
 # Semantic Headings with Violet Accent
@@ -281,19 +274,6 @@ def cli_kv(key: str, value: Any, indent: int = 2, key_width: int = 18, print_out
 
 
 # Semantic Badges & Status Pills
-def cli_badge(text: str, category: str = "info") -> str:
-    """Generate a high-visibility badge pill."""
-    cat = category.lower()
-    if cat in ("success", "active", "passed", "pass"):
-        return style(f" {text} ", Style.BOLD, Style.BRIGHT_WHITE, Style.BG_VIOLET)
-    elif cat in ("warning", "candidate", "pending"):
-        return style(f" {text} ", Style.BOLD, Style.BLACK, "\033[48;5;183m")
-    elif cat in ("danger", "error", "failed", "rejected", "retired"):
-        return style(f" {text} ", Style.BOLD, Style.BRIGHT_WHITE, "\033[41m")
-    else:
-        return style(f" {text} ", Style.BOLD, Style.BRIGHT_WHITE, Style.BG_PURPLE)
-
-
 def status_pill(status: str) -> str:
     """Render a status string with appropriate violet/green colors and symbols."""
     s = status.upper()

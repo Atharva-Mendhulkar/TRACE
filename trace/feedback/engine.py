@@ -4,7 +4,6 @@ Human-in-the-Loop (HITL) Feedback & Model Promotion Engine (PRD M10, §23.4, §2
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 import datetime
 import json
 import logging
@@ -12,7 +11,6 @@ from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
-import sqlalchemy as sa
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
@@ -39,34 +37,10 @@ class FeedbackRecord(BaseModel):
     )
 
 
-class FeedbackStore(ABC):
-    """Abstract interface for storing and retrieving feedback records."""
-
-    @abstractmethod
-    def save_feedback(self, record: FeedbackRecord) -> None:
-        pass
-
-    @abstractmethod
-    def get_feedback(self, feedback_id: str) -> Optional[FeedbackRecord]:
-        pass
-
-    @abstractmethod
-    def get_feedback_for_violation(self, violation_id: str) -> List[FeedbackRecord]:
-        pass
-
-    @abstractmethod
-    def list_feedback(self, applied: Optional[bool] = None) -> List[FeedbackRecord]:
-        pass
-
-    @abstractmethod
-    def mark_applied(self, feedback_id: str, applied_in_model_id: str) -> None:
-        pass
-
-
 from sqlalchemy.pool import StaticPool
 
 
-class RelationalFeedbackStore(FeedbackStore):
+class RelationalFeedbackStore:
     """SQLAlchemy-backed feedback store compatible with PostgreSQL and SQLite."""
 
     def __init__(self, db_url: str = "sqlite:///:memory:", engine: Optional[Engine] = None):
@@ -131,38 +105,6 @@ class RelationalFeedbackStore(FeedbackStore):
                 },
             )
 
-    def get_feedback(self, feedback_id: str) -> Optional[FeedbackRecord]:
-        with self.engine.connect() as conn:
-            row = conn.execute(
-                text(
-                    """
-                    SELECT feedback_id, violation_id, feedback_type, reviewer,
-                           comment, applied, applied_in_model_id, metadata, created_at
-                    FROM feedback WHERE feedback_id = :f_id
-                    """
-                ),
-                {"f_id": feedback_id},
-            ).fetchone()
-
-        if not row:
-            return None
-        return self._row_to_record(row)
-
-    def get_feedback_for_violation(self, violation_id: str) -> List[FeedbackRecord]:
-        with self.engine.connect() as conn:
-            rows = conn.execute(
-                text(
-                    """
-                    SELECT feedback_id, violation_id, feedback_type, reviewer,
-                           comment, applied, applied_in_model_id, metadata, created_at
-                    FROM feedback WHERE violation_id = :v_id
-                    ORDER BY created_at ASC
-                    """
-                ),
-                {"v_id": violation_id},
-            ).fetchall()
-        return [self._row_to_record(r) for r in rows]
-
     def list_feedback(self, applied: Optional[bool] = None) -> List[FeedbackRecord]:
         query = (
             "SELECT feedback_id, violation_id, feedback_type, reviewer, "
@@ -177,19 +119,6 @@ class RelationalFeedbackStore(FeedbackStore):
         with self.engine.connect() as conn:
             rows = conn.execute(text(query), params).fetchall()
         return [self._row_to_record(r) for r in rows]
-
-    def mark_applied(self, feedback_id: str, applied_in_model_id: str) -> None:
-        with self.engine.begin() as conn:
-            conn.execute(
-                text(
-                    """
-                    UPDATE feedback
-                    SET applied = 1, applied_in_model_id = :m_id
-                    WHERE feedback_id = :f_id
-                    """
-                ),
-                {"m_id": applied_in_model_id, "f_id": feedback_id},
-            )
 
     def _row_to_record(self, row: Any) -> FeedbackRecord:
         meta = json.loads(row[7]) if row[7] else {}
@@ -213,7 +142,7 @@ class FeedbackEngine:
 
     def __init__(
         self,
-        store: Optional[FeedbackStore] = None,
+        store: Optional[RelationalFeedbackStore] = None,
         model_repo: Optional[ModelRepository] = None,
     ):
         self.store = store or RelationalFeedbackStore()
@@ -252,9 +181,6 @@ class FeedbackEngine:
 
     def list_feedback(self, applied: Optional[bool] = None) -> List[FeedbackRecord]:
         return self.store.list_feedback(applied=applied)
-
-    def get_feedback(self, feedback_id: str) -> Optional[FeedbackRecord]:
-        return self.store.get_feedback(feedback_id)
 
     def review_candidate_model(
         self,

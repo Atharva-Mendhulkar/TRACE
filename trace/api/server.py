@@ -9,26 +9,17 @@ from __future__ import annotations
 from pathlib import Path
 import time
 from typing import Any, Dict, List, Literal, Optional
-from uuid import uuid4
-
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
-from trace.corpus.repository import TraceRepository
 from trace.corpus.store import TraceStore
 from trace.feedback.engine import FeedbackEngine, FeedbackType, RelationalFeedbackStore
-from trace.ingestion.pipeline import IngestionPipeline
 from trace.models.pdfa import PDFA
 from trace.models.repository import ModelLifecycleStatus, ModelRepository
 from trace.policy.compiler import PolicyCompiler
 from trace.policy.dsl import PolicyParser
-from trace.schema.models import CESRecord, validate_ces_record
-from trace.storage.postgres import PostgresStore
-from trace.verification.session_cache import (
-    InMemorySessionCache,
-    SessionCache,
-)
+from trace.schema.models import CESRecord
 from trace.verification.verifier import RuntimeVerifier, VerificationResponse
 
 
@@ -95,10 +86,7 @@ class TelemetryMetrics:
         return "\n".join(lines) + "\n"
 
 
-def create_app(
-    db_path: str = ":memory:",
-    session_cache: Optional[SessionCache] = None,
-) -> FastAPI:
+def create_app(db_path: str = ":memory:") -> FastAPI:
     """Factory creating configured FastAPI instance with attached services."""
     app = FastAPI(
         title="TRACE Runtime API",
@@ -107,13 +95,12 @@ def create_app(
     )
 
     # State dependencies
-    trace_repo = PostgresStore(f"sqlite:///{db_path}" if db_path != ":memory:" else "sqlite:///:memory:")
+    trace_repo = TraceStore(db_path)
     model_repo = ModelRepository(db_path)
     feedback_engine = FeedbackEngine(
         store=RelationalFeedbackStore(f"sqlite:///{db_path}" if db_path != ":memory:" else "sqlite:///:memory:"),
         model_repo=model_repo,
     )
-    cache = session_cache or InMemorySessionCache()
     metrics = TelemetryMetrics()
 
     # Active verifier cache: agent_id -> RuntimeVerifier
@@ -148,7 +135,7 @@ def create_app(
             learner_config={"algorithm": "ALERGIA", "alpha": 0.05},
         )
         model_repo.validate_model(m_id)
-        model_repo.promote_model(m_id, approver="system-seed")
+        model_repo.promote_model(m_id)
 
         verifiers.clear()
         metrics.events_ingested_total += 42
@@ -176,18 +163,13 @@ def create_app(
         errors = []
 
         for item in events:
-            val = validate_ces_record(item)
-            if not val.is_valid:
-                errors.extend(val.errors)
-                continue
             try:
-                record = CESRecord.model_validate(item)
-                accepted_records.append(record)
+                accepted_records.append(CESRecord.model_validate(item))
             except Exception as e:
                 errors.append(str(e))
 
         if accepted_records:
-            trace_repo.insert_events_batch(accepted_records)
+            trace_repo.write_events(accepted_records)
             metrics.events_ingested_total += len(accepted_records)
 
         return IngestionResponse(
@@ -224,7 +206,7 @@ def create_app(
             )
 
         verifier = verifiers[agent_id]
-        resp = verifier.verify_event(req.event, session_cache=cache)
+        resp = verifier.verify_event(req.event)
 
         # Update telemetry
         latency_ms = (time.perf_counter() - t_start) * 1000.0

@@ -52,11 +52,11 @@ ${CLI} ingest-benchmark mock_data/benchmark_trajectories.json --dataset swebench
 
 # 7. Model Training (ALERGIA inference on ingested research-agent traces)
 echo -e "\n--> 7. Testing 'trace train' for research-agent"
-${CLI} train --agent-id research-agent --engine native-alergia --heuristic alergia --alpha 0.05 --db "${DB}"
+${CLI} train --agent-id research-agent --engine native-alergia --alpha 0.05 --db "${DB}"
 
 # 8. Model Training for security-agent
 echo -e "\n--> 8. Testing 'trace train' for security-agent"
-${CLI} train --agent-id security-agent --engine native-alergia --heuristic alergia --alpha 0.05 --db "${DB}"
+${CLI} train --agent-id security-agent --engine native-alergia --alpha 0.05 --db "${DB}"
 
 # 9. Model List
 echo -e "\n--> 9. Testing 'trace model list'"

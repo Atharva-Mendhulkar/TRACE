@@ -4,11 +4,11 @@
 <div align="center">
 
 [![CI Quality Gates](https://github.com/Atharva-Mendhulkar/TRACE/actions/workflows/ci.yml/badge.svg)](https://github.com/Atharva-Mendhulkar/TRACE/actions/workflows/ci.yml)
-[![Tests Passing](https://img.shields.io/badge/Tests-60%2F60%20Passing%20(100%25)-success?style=flat-square&logo=pytest)](trace/tests/)
+[![Tests Passing](https://img.shields.io/badge/Tests-55%20Passing%20(100%25)-success?style=flat-square&logo=pytest)](trace/tests/)
 [![Verification Latency](https://img.shields.io/badge/Latency%20p99-%3C0.03ms%20(budget%20%3C5ms)-8A2BE2?style=flat-square)](#rq3-verification-latency)
 [![Framework Adapters](https://img.shields.io/badge/Framework%20Adapters-9%20Active-brightgreen?style=flat-square)](#1-canonical-event-schema-ces-v10--adapter-registry)
 [![Python Matrix](https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue?style=flat-square&logo=python)](https://www.python.org/)
-[![Docker & Compose](https://img.shields.io/badge/Docker-Postgres%20%7C%20Redis%20%7C%20API-blue?style=flat-square&logo=docker)](docker-compose.yml)
+[![Docker & Compose](https://img.shields.io/badge/Docker-API-blue?style=flat-square&logo=docker)](docker-compose.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 </div>
@@ -51,9 +51,9 @@
 
 **TRACE** is an open-source, research-grade verification engine engineered for autonomous, multi-agent AI systems. As heterogeneous agents interact with external APIs, execute bash commands, and orchestrate subagent handoffs, their stochastic behavior routinely exceeds the capabilities of static rule engines, prompt assertions, and unit tests.
 
-TRACE observes positive-only execution traces across 9 industry framework adapters, synthesizes formal **Probabilistic Deterministic Finite Automata (PDFA)** via state-merging learners (ALERGIA / MDI, EDSM, and FlexFringe), and performs **sub-millisecond streaming runtime verification** ($p99 < 0.03\text{ ms}$, exceeding the $<5.0\text{ ms}$ budget by $240\times$) using dual-control product automaton composition against declarative safety policies.
+TRACE observes positive-only execution traces across 9 industry framework adapters, synthesizes formal **Probabilistic Deterministic Finite Automata (PDFA)** via state-merging learners (ALERGIA / MDI and EDSM), and performs **sub-millisecond streaming runtime verification** ($p99 < 0.03\text{ ms}$, exceeding the $<5.0\text{ ms}$ budget by $240\times$) using dual-control product automaton composition against declarative safety policies.
 
-The system features an interactive **Electric Violet Semantic Terminal Interface**, a built-in step-by-step interactive capability demonstration, a dark-mode **Web Console (`/dashboard`)** with real-time SVG graph visualizers, and a complete Dockerized microservice architecture backed by PostgreSQL 16 + `pgvector` and Redis Streams.
+The system features an interactive **Electric Violet Semantic Terminal Interface**, a built-in step-by-step interactive capability demonstration, a dark-mode **Web Console (`/dashboard`)** with real-time SVG graph visualizers, and a Dockerized API service architecture backed by SQLite.
 
 ---
 
@@ -82,17 +82,14 @@ flowchart TD
         DLQ["Dead-Letter Queue (DLQ)\n(Invalid Schema Partitioning)"]
     end
 
-    subgraph Persistence ["Persistence & Stream Cache Tier"]
-        PG[("PostgreSQL 16 + pgvector\nCES Relational Store & HNSW Cosine Index")]
-        RDS[("Redis 7.2 Cluster\nEvent Streams & O(1) Session State Cache")]
+    subgraph Persistence ["Persistence Tier"]
+        PG[("SQLite\nCES Relational Store")]
     end
 
     subgraph Inference ["Automata Inference & Synthesis Tier"]
         PTA["Prefix Tree Acceptor (PTA)"]
         ALERGIA["ALERGIA / MDI Learner\n(Hoeffding Statistical Merging)"]
         EDSM["Evidence-Driven State Merging (EDSM)"]
-        FF["FlexFringe C++ Subprocess Runner"]
-        CLUST["Semantic Action Clustering\n(n-gram Cosine Nearest-Centroid)"]
         FOLD["Hierarchical Delegation Folding\n(Role Sub-Trace Isolation §16)"]
     end
 
@@ -113,17 +110,15 @@ flowchart TD
     Frameworks -->|Raw Events & Trajectories| ING
     ING --> NORM
     NORM --> RED
-    RED -->|Valid CES| PG & RDS
+    RED -->|Valid CES| PG
     RED -->|Malformed| DLQ
 
     PG -->|Training Corpus| PTA
-    PTA --> ALERGIA & EDSM & FF
-    CLUST --> PTA
+    PTA --> ALERGIA & EDSM
     FOLD --> ALERGIA
     ALERGIA -->|Learned PDFA| PROD
 
     POL -->|Compiled Safety DFA| PROD
-    RDS -->|Streaming Incremental Events| PROD
     PROD --> NLL
     PROD -->|Non-conformance| EXPL
     NLL --> DRIFT
@@ -148,10 +143,9 @@ flowchart TD
 - Normalizes disparate tool calls, subagent spawns, and observation returns across all 9 frameworks.
 - Built-in Shannon entropy calculations and regex matching sanitize API keys, Bearer tokens, private keys, and authorization headers before parameter schema hashing.
 
-### 3. Positive-Only Protocol Inference (PTA, ALERGIA, EDSM, FlexFringe)
+### 3. Positive-Only Protocol Inference (PTA, ALERGIA, EDSM)
 - Constructs deterministic Prefix Tree Acceptors (PTA) from positive-only stochastic traces.
 - Native, pure-Python state-merging engine implementing **ALERGIA / MDI** statistical compatibility tests via Hoeffding bounds ($\alpha$) and **EDSM** (Evidence-Driven State Merging).
-- High-performance C++ subprocess integration wrapper for the **FlexFringe** automata learning engine.
 
 ### 4. Hierarchical Delegation Folding (§16)
 - Models multi-agent systems with explicit `delegate(role)` boundary symbols.
@@ -168,11 +162,6 @@ flowchart TD
 ### 6. Behavioral Concept Drift Detection (KS Test & Tail-Quantile CUSUM)
 - Continuously evaluates rolling conformance-score (NLL) distributions against training baselines.
 - Employs two-sample Kolmogorov-Smirnov (KS) hypothesis tests combined with 95th percentile tail-quantile CUSUM alerting to flag distribution shifts and trigger automated out-of-cycle relearning.
-
-### 7. Semantic Action Clustering & Vector Embeddings
-- Character $n$-gram deterministic embedding model producing 768-dimensional vectors.
-- Agglomerative hierarchical clustering with cosine distance thresholding ($\tau$).
-- Nearest-centroid taxonomy mapping reducing raw, open-ended action spaces by $> 70\%$.
 
 ### 8. Human-in-the-Loop (HITL) Violation Triage & Candidate Lifecycle
 - Review triage workflow for runtime violations: **Approve (Valid Novelty)**, **Reject (Confirmed Threat)**, **Override Transition**.
@@ -195,7 +184,6 @@ TRACE/
 │   └── test_cli.sh                   # Comprehensive 19-step automated CLI test script
 ├── trace/
 │   ├── _version.py                   # Package version specifier
-│   ├── abstraction/                  # Agglomerative clustering & taxonomy mapping
 │   ├── adapters/                     # All 9 Framework adapters (MCP, LangGraph, SWE-bench, etc.)
 │   │   ├── base.py                   # Adapter registry & RawTraceEvent interface
 │   │   ├── autogen.py                # AutoGen / AG2 multi-agent adapter
@@ -219,16 +207,15 @@ TRACE/
 │   ├── drift/                        # Rolling KS test & tail-quantile CUSUM detector
 │   ├── explainability/               # Counterexample generation & human-readable diffs
 │   ├── feedback/                     # HITL violation triage engine & model promotion
-│   ├── inference/                    # PTA builder, ALERGIA, EDSM, and FlexFringe runner
+│   ├── inference/                    # PTA builder, ALERGIA, and EDSM learners
 │   ├── models/                       # PDFA formal model, repository, lifecycle management
 │   ├── policy/                       # Policy DSL lexer/parser & minimal DFA compiler
 │   ├── schema/                       # Canonical Event Schema (CES v1.0) & validator
-│   ├── storage/                      # PostgreSQL + pgvector schema & SQLAlchemy store
-│   ├── streaming/                    # Redis Stream and async queue consumers with DLQ
-│   ├── tests/                        # 60 automated unit, contract, and benchmark tests
+│   ├── streaming/                    # Async queue consumers with DLQ
+│   ├── tests/                        # 55 automated unit, contract, and benchmark tests
 │   └── verification/                 # Sub-millisecond runtime verifier & session cache
 ├── Dockerfile                        # Multi-stage hardened production container
-├── docker-compose.yml                # Multi-container stack (Postgres+pgvector, Redis, API, Verifier)
+├── docker-compose.yml                # Dockerized API service
 ├── pyproject.toml                    # Build configuration, console scripts & dependencies
 └── LICENSE                           # MIT License
 ```
@@ -249,17 +236,16 @@ Every component, schema contract, and architectural invariant is verified by aut
 │ trace/tests/test_benchmark   │ SWE-bench & OSWorld Importers│ 5 tests   │ ✓ Passed     │
 │ trace/tests/test_cli_ui      │ Semantic Violet CLI & REPL │ 9 tests     │ ✓ Passed     │
 │ trace/tests/test_cli_mock    │ Mock Data E2E Lifecycle    │ 1 test      │ ✓ Passed     │
-│ trace/tests/test_clustering  │ n-gram Vector Taxonomy     │ 3 tests     │ ✓ Passed     │
 │ trace/tests/test_golden      │ End-to-End Pipeline Fixture│ 1 test      │ ✓ Passed     │
 │ trace/tests/test_hierarchical│ Multi-Agent Role Isolation │ 7 tests     │ ✓ Passed     │
 │ trace/tests/test_inference   │ PTA & ALERGIA State Merging│ 4 tests     │ ✓ Passed     │
-│ trace/tests/test_phase2      │ PostgreSQL, pgvector, Cache│ 6 tests     │ ✓ Passed     │
+│ trace/tests/test_phase2      │ TraceStore & Feedback    │ 4 tests     │ ✓ Passed     │
 │ trace/tests/test_phase3      │ FastAPI, Streaming, Workers│ 5 tests     │ ✓ Passed     │
 │ trace/tests/test_policy      │ Policy DSL & DFA Compiler  │ 4 tests     │ ✓ Passed     │
 │ trace/tests/test_schema      │ CES v1.0 & Secret Redaction│ 4 tests     │ ✓ Passed     │
 │ trace/tests/test_verification│ Dual-Control Verifier & KS │ 3 tests     │ ✓ Passed     │
 ├──────────────────────────────┼────────────────────────────┼─────────────┼──────────────┤
-│ TOTAL AUTOMATED TESTS        │ Full Test Suite Coverage   │ 60 tests    │ 100% Passed  │
+│ TOTAL AUTOMATED TESTS        │ Full Test Suite Coverage   │ 55 tests    │ 100% Passed  │
 ├──────────────────────────────┼────────────────────────────┼─────────────┼──────────────┤
 │ Empirical Evaluation (RQ1-6) │ Academic Benchmarks Matrix │ 6 Questions │ All Passed   │
 └──────────────────────────────┴────────────────────────────┴─────────────┴──────────────┘
@@ -278,7 +264,6 @@ TRACE includes a rigorous benchmark evaluation harness (`trace benchmark run --r
 | **RQ3: Verification Latency** | Single-event verification latency | **$\mathbf{p99 = 0.0206\text{ ms}}$** (p50: 0.015ms) | $\le 5.0\text{ ms}$ ($240\times$ faster) | **PASSED** |
 | **RQ4: Policy Enforcement** | Safety violation detection accuracy | **$100.0\%$ Accuracy** (0 false negatives) | $100\%$ detection | **PASSED** |
 | **RQ5: Drift Detection** | Two-sample KS test on shifted traces | **$\text{KS} = 0.9800$, Triggered** | Flag distribution shift | **PASSED** |
-| **RQ6: Semantic Abstraction**| State space reduction ratio | **$70.83\%$ Reduction** ($24 \rightarrow 7$ states) | $\ge 50\%$ reduction | **PASSED** |
 
 ---
 
@@ -426,18 +411,14 @@ python -m trace.api.server --host 0.0.0.0 --port 8000
 
 ## Docker Compose Deployment
 
-To deploy TRACE with PostgreSQL 16 + `pgvector`, Redis 7.2, FastAPI Gateway, and background verification workers:
+To deploy the TRACE FastAPI Gateway in Docker:
 
 ```bash
 docker compose up --build -d
 ```
 
 ### Services Included:
-- **`postgres`**: PostgreSQL 16 with `pgvector` extension enabled on port `5432`.
-- **`redis`**: Redis 7.2 on port `6379` for stream consumers and $O(1)$ session state.
 - **`api`**: FastAPI Gateway Server on port `8000` (serving `/dashboard`, `/metrics`, `/v1/events`, `/v1/verify`).
-- **`verifier`**: High-throughput Redis Stream verification worker.
-- **`learner`**: Background protocol learning worker.
 
 ---
 
@@ -446,14 +427,12 @@ docker compose up --build -d
 - [x] **Phase 1: Core Research Prototype**
   - Canonical Event Schema (CES v1.0) JSON-Schema draft 2020-12 validation and secret redaction.
   - Initial 2 adapters: Model Context Protocol (MCP) and LangGraph.
-  - Pure-Python reference learners: PTA builder, ALERGIA / MDI with Hoeffding bounds, EDSM, RPNI, and FlexFringe runner.
+  - Pure-Python reference learners: PTA builder, ALERGIA / MDI with Hoeffding bounds, and EDSM.
   - Formal PDFA model, Policy DSL compiler, dual-control product automaton, explainability diffs, and drift detector.
 - [x] **Phase 2: Research-Grade System**
-  - Semantic embedding clustering and nearest-centroid taxonomy mapping.
-  - PostgreSQL 16 + `pgvector` persistence with HNSW cosine distance indexing.
   - Remaining 5 framework adapters (CrewAI, OpenAI Agents SDK, Semantic Kernel, Google ADK, AutoGen).
   - Hierarchical delegation folding (§16) with sub-trace isolation and recursion depth bounds.
-  - Redis 7.2 streaming session cache and Human-in-the-Loop (HITL) feedback triage engine.
+  - Human-in-the-Loop (HITL) feedback triage engine.
 - [x] **Phase 3: Production & Empirical Evaluation**
   - Real-world benchmark dataset adapters for SWE-bench and OSWorld with golden fixtures.
   - FastAPI REST API gateway, streaming queue consumers, and multi-container Docker Compose deployment.

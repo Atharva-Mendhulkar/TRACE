@@ -3,10 +3,10 @@ Behavioral Drift Detector (PRD §22).
 """
 
 from __future__ import annotations
+from dataclasses import dataclass
+from typing import List, Optional
 
 import datetime
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import numpy as np

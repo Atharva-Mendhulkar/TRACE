@@ -9,14 +9,7 @@ from typing import Any, Dict, List
 from uuid import uuid4
 
 from trace.adapters.base import FrameworkAdapter, RawTraceEvent, register_adapter
-from trace.schema.models import (
-    CESRecord,
-    EventAttributes,
-    ErrorInfo,
-    ProvenanceInfo,
-    ValidationResult,
-    compute_param_schema_hash,
-)
+from trace.schema.models import ValidationResult
 
 
 class AutoGenAdapter(FrameworkAdapter):
@@ -187,14 +180,11 @@ class AutoGenAdapter(FrameworkAdapter):
                     timestamp=timestamp,
                     framework="autogen",
                     framework_schema_version=schema_version,
-                    sequence_no=seq_no,
-                    metadata={"recipient": str(recipient)},
-                )
+                    sequence_no=seq_no                )
             )
 
         # 5. Error
         elif event_kind in ("error", "execution_error") or "error" in raw_event:
-            err_msg = str(raw_event.get("error") or "autogen_error")
             events.append(
                 RawTraceEvent(
                     trace_id=trace_id,
@@ -212,9 +202,7 @@ class AutoGenAdapter(FrameworkAdapter):
                     timestamp=timestamp,
                     framework="autogen",
                     framework_schema_version=schema_version,
-                    sequence_no=seq_no,
-                    metadata={"error": err_msg},
-                )
+                    sequence_no=seq_no                )
             )
 
         # 6. Fallback: message / plan step
@@ -240,48 +228,6 @@ class AutoGenAdapter(FrameworkAdapter):
             )
 
         return events
-
-    def to_ces(self, raw_trace_event: RawTraceEvent) -> CESRecord:
-        param_hash = compute_param_schema_hash(raw_trace_event.param_schema)
-        symbol = raw_trace_event.canonical_symbol_candidate or raw_trace_event.raw_symbol
-
-        error_obj = None
-        if raw_trace_event.error_class:
-            error_obj = ErrorInfo(
-                error_class=raw_trace_event.error_class,
-                retryable=raw_trace_event.retryable_error,
-            )
-
-        return CESRecord(
-            schema_version="1.0",
-            event_id=str(uuid4()),
-            trace_id=raw_trace_event.trace_id,
-            span_id=raw_trace_event.span_id,
-            parent_span_id=raw_trace_event.parent_span_id,
-            agent_id=raw_trace_event.agent_id,
-            role=raw_trace_event.role,
-            depth=raw_trace_event.depth,
-            event_type=raw_trace_event.event_type,  # type: ignore
-            symbol=symbol,
-            raw_symbol=raw_trace_event.raw_symbol,
-            attributes=EventAttributes(
-                param_schema_hash=param_hash,
-                status=raw_trace_event.status if raw_trace_event.status in ["success", "failure", "timeout"] else "unknown",  # type: ignore
-                latency_ms=raw_trace_event.latency_ms,
-                retry_count=raw_trace_event.retry_count,
-            ),
-            error=error_obj,
-            timestamp=raw_trace_event.timestamp,
-            framework="autogen",
-            framework_schema_version=raw_trace_event.framework_schema_version,
-            adapter_version=self.adapter_version,
-            sequence_no=raw_trace_event.sequence_no,
-            status=raw_trace_event.status if raw_trace_event.status in ["success", "failure", "timeout"] else "unknown",  # type: ignore
-            provenance=ProvenanceInfo(
-                timestamp_source="framework",
-                ingested_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            ),
-        )
 
 
 # Register singleton

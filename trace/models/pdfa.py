@@ -4,20 +4,8 @@ Probabilistic Deterministic Finite Automaton (PDFA) Formal Model (PRD §15).
 
 from __future__ import annotations
 
-import json
 import math
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
-
-
-@dataclass
-class PDFATransition:
-    from_state: str
-    symbol: str
-    to_state: str
-    frequency: int
-    probability: float
-    low_confidence: bool = False
 
 
 class PDFA:
@@ -104,6 +92,68 @@ class PDFA:
         """Return set of defined symbols from state."""
         return {sym for (s, sym) in self.delta.keys() if s == state}
 
+    def merge_state(self, q_keep: str, q_merge: str) -> None:
+        """Merge q_merge into q_keep, determinizing conflicts iteratively (PRD §14.3)."""
+        if q_keep == q_merge:
+            return
+        queue: List[Tuple[str, str]] = [(q_keep, q_merge)]
+        while queue:
+            k_st, m_st = queue.pop(0)
+            if k_st == m_st:
+                continue
+            self.final_counts[k_st] = self.final_counts.get(k_st, 0) + self.final_counts.get(m_st, 0)
+            if m_st in self.F:
+                self.F.add(k_st)
+            for key, target in list(self.delta.items()):
+                if target == m_st:
+                    self.delta[key] = k_st
+            for (from_s, sym), m_target in list(self.delta.items()):
+                if from_s != m_st:
+                    continue
+                m_count = self.counts.get((m_st, sym), 0)
+                if (k_st, sym) in self.delta:
+                    k_target = self.delta[(k_st, sym)]
+                    self.counts[(k_st, sym)] += m_count
+                    if k_target != m_target:
+                        queue.append((k_target, m_target))
+                else:
+                    self.delta[(k_st, sym)] = m_target
+                    self.counts[(k_st, sym)] = m_count
+                del self.delta[(m_st, sym)]
+                self.counts.pop((m_st, sym), None)
+            self.states.discard(m_st)
+            self.F.discard(m_st)
+            self.state_totals.pop(m_st, None)
+            self.final_counts.pop(m_st, None)
+        self.state_totals = {
+            st: sum(cnt for (s, _), cnt in self.counts.items() if s == st)
+            for st in self.states
+        }
+
+    def canonicalize(self) -> "PDFA":
+        """Relabel states in BFS order from q0 and return a fresh PDFA."""
+        new = PDFA(q0="q0", alphabet=self.alphabet)
+        state_map = {self.q0: "q0"}
+        counter = 0
+        queue = [self.q0]
+        visited = {self.q0}
+        while queue:
+            st = queue.pop(0)
+            alias = state_map[st]
+            new.add_state(alias, is_final=(st in self.F))
+            new.final_counts[alias] = self.final_counts.get(st, 0)
+            for sym, tgt in sorted((s, t) for (s, t) in ((k[1], v) for k, v in self.delta.items() if k[0] == st)):
+                if tgt not in state_map:
+                    counter += 1
+                    state_map[tgt] = f"q{counter}"
+                if tgt not in visited:
+                    visited.add(tgt)
+                    queue.append(tgt)
+                freq = self.counts.get((st, sym), 1)
+                new.add_transition(alias, sym, state_map[tgt], frequency=freq, recompute_probs=False)
+        new.recompute_all_probabilities()
+        return new
+
     def compute_trace_mean_nll(
         self, symbols: List[str]
     ) -> Tuple[float, List[Optional[float]], bool]:
@@ -185,19 +235,3 @@ class PDFA:
 
         pdfa.recompute_all_probabilities()
         return pdfa
-
-    def to_dot(self) -> str:
-        """Export automaton as Graphviz DOT string."""
-        lines = ["digraph PDFA {", "  rankdir=LR;", "  node [shape=circle];"]
-        lines.append(f'  "{self.q0}" [style=bold];')
-        for f_st in self.F:
-            lines.append(f'  "{f_st}" [shape=doublecircle];')
-
-        for (s, sym), t in self.delta.items():
-            prob = self.P.get((s, sym), 0.0)
-            freq = self.counts.get((s, sym), 0)
-            label = f"{sym}\\nP={prob:.2f} (n={freq})"
-            lines.append(f'  "{s}" -> "{t}" [label="{label}"];')
-
-        lines.append("}")
-        return "\n".join(lines)

@@ -7,14 +7,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
-import jsonschema
-from pydantic import BaseModel, Field, field_validator
-
-SCHEMA_PATH = Path(__file__).parent / "ces-v1.json"
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 EventType = Literal[
     "tool_call",
@@ -134,43 +130,14 @@ class ValidationResult(BaseModel):
     schema_version: str = "1.0"
 
 
-class ViolationRecord(BaseModel):
-    """Runtime violation record conforming to PRD §29."""
-
-    violation_id: str = Field(default_factory=lambda: str(uuid4()))
-    trace_id: str
-    event_id: str
-    agent_id: str
-    role: Optional[str] = None
-    classification: List[str] = Field(default_factory=list)
-    explanation: Dict[str, Any] = Field(default_factory=dict)
-    model_id: Optional[str] = None
-    policy_id: Optional[str] = None
-    created_at: str = Field(
-        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat()
-    )
-
-
-_SCHEMA_CACHE: Optional[Dict[str, Any]] = None
-
-
-def load_ces_schema() -> Dict[str, Any]:
-    global _SCHEMA_CACHE
-    if _SCHEMA_CACHE is None:
-        with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
-            _SCHEMA_CACHE = json.load(f)
-    return _SCHEMA_CACHE
-
-
 def validate_ces_record(record_dict: Dict[str, Any]) -> ValidationResult:
-    """Validate a raw record dictionary against the canonical JSON schema."""
-    schema = load_ces_schema()
-    validator = jsonschema.Draft202012Validator(schema)
-    errors = []
-    for e in validator.iter_errors(record_dict):
-        field_path = "/".join(str(p) for p in e.path)
-        if field_path:
-            errors.append(f"{field_path}: {e.message}")
-        else:
-            errors.append(e.message)
-    return ValidationResult(is_valid=len(errors) == 0, errors=errors)
+    """Validate a raw record dictionary against the CES pydantic model."""
+    try:
+        CESRecord.model_validate(record_dict)
+        return ValidationResult(is_valid=True, errors=[])
+    except ValidationError as e:
+        errors = [
+            f"{'/'.join(str(p) for p in err['loc'])}: {err['msg']}"
+            for err in e.errors()
+        ]
+        return ValidationResult(is_valid=False, errors=errors)

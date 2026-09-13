@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from trace.adapters.base import get_adapter
-from trace.schema.models import CESRecord, validate_ces_record
+from trace.schema.models import CESRecord
 
 
 @dataclass
@@ -19,24 +19,12 @@ class IngestionResult:
     rejected: List[Dict[str, Any]] = field(default_factory=list)
     duplicates: List[str] = field(default_factory=list)
 
-    @property
-    def total_count(self) -> int:
-        return len(self.accepted) + len(self.rejected) + len(self.duplicates)
-
 
 class IngestionPipeline:
     """Orchestrates framework adaptation, validation, and dead-letter routing."""
 
     def __init__(self, trace_store: Optional[Any] = None):
         self.trace_store = trace_store
-
-    def ingest_event(
-        self,
-        raw_event: Dict[str, Any],
-        framework: Optional[str] = None,
-    ) -> IngestionResult:
-        """Process a single raw framework event dictionary."""
-        return self.ingest_events([raw_event], framework=framework)
 
     def ingest_events(
         self,
@@ -49,18 +37,12 @@ class IngestionPipeline:
         for idx, raw in enumerate(raw_events):
             # Check if this is already a valid CESRecord
             if "schema_version" in raw and raw.get("schema_version") == "1.0":
-                val = validate_ces_record(raw)
-                if val.is_valid:
-                    try:
-                        record = CESRecord(**raw)
-                        self._handle_accepted_record(record, result)
-                        continue
-                    except Exception as e:
-                        result.rejected.append({"index": idx, "raw_event": raw, "reason": str(e)})
-                        continue
-                else:
-                    result.rejected.append({"index": idx, "raw_event": raw, "reason": val.errors})
-                    continue
+                try:
+                    record = CESRecord.model_validate(raw)
+                    self._handle_accepted_record(record, result)
+                except Exception as e:
+                    result.rejected.append({"index": idx, "raw_event": raw, "reason": str(e)})
+                continue
 
             # Detect framework
             fw = framework or raw.get("framework") or self._infer_framework(raw)
@@ -104,23 +86,10 @@ class IngestionPipeline:
                 })
                 continue
 
-            # Convert to CESRecords and validate
+            # Convert to CESRecords
             for p_event in parsed_events:
                 try:
-                    ces_record = adapter.to_ces(p_event)
-                    ces_dict = ces_record.model_dump()
-                    val = validate_ces_record(ces_dict)
-                    if not val.is_valid:
-                        result.rejected.append({
-                            "index": idx,
-                            "raw_event": raw,
-                            "ces_record": ces_dict,
-                            "reason": f"CES schema validation failed: {val.errors}"
-                        })
-                        continue
-
-                    self._handle_accepted_record(ces_record, result)
-
+                    self._handle_accepted_record(adapter.to_ces(p_event), result)
                 except Exception as e:
                     result.rejected.append({
                         "index": idx,

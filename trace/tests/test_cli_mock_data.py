@@ -53,7 +53,6 @@ def test_full_cli_mock_data_lifecycle(tmp_path):
         "train",
         "--agent-id", "research-agent",
         "--engine", "native-alergia",
-        "--heuristic", "alergia",
         "--alpha", "0.05",
         "--db", db_file,
     ])

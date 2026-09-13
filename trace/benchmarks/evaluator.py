@@ -3,15 +3,15 @@ Empirical Evaluation Runner for Research Questions RQ1–RQ6 (PRD §32).
 """
 
 from __future__ import annotations
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional
 
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
 import numpy as np
 
 from trace.benchmarks.generator import BenchmarkTraceGenerator
 from trace.drift.detector import DriftDetector
-from trace.inference.native_learner import NativeStateMergingLearner
+from trace.inference.native_alergia import NativeStateMergingLearner
 from trace.policy.compiler import PolicyCompiler
 from trace.policy.dsl import PolicyParser
 from trace.verification.verifier import RuntimeVerifier
@@ -131,7 +131,7 @@ class BenchmarkSuite:
         state_counts = []
         trans_counts = []
 
-        learner = NativeStateMergingLearner(heuristic="alergia", alpha=0.05)
+        learner = NativeStateMergingLearner(alpha=0.05)
         for s in sizes:
             corpus = self.generator.generate_normal_corpus(s)
             pdfa = learner.fit(corpus)
@@ -144,7 +144,7 @@ class BenchmarkSuite:
         """Evaluate precision, recall, and F1 across normal and anomalous traces."""
         # Train baseline PDFA on 100 normal traces
         train_corpus = self.generator.generate_normal_corpus(100)
-        learner = NativeStateMergingLearner(heuristic="alergia", alpha=0.05)
+        learner = NativeStateMergingLearner(alpha=0.05)
         pdfa = learner.fit(train_corpus)
 
         verifier = RuntimeVerifier(pdfa=pdfa)
@@ -182,7 +182,7 @@ class BenchmarkSuite:
     def run_rq3(self, num_events: int = 1000) -> RQ3Result:
         """Evaluate per-event verification latency against the 5ms budget."""
         train_corpus = self.generator.generate_normal_corpus(50)
-        learner = NativeStateMergingLearner(heuristic="alergia", alpha=0.05)
+        learner = NativeStateMergingLearner(alpha=0.05)
         pdfa = learner.fit(train_corpus)
         verifier = RuntimeVerifier(pdfa=pdfa)
 

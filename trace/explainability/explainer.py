@@ -3,10 +3,10 @@ Explainability & Counterexample Generation (PRD §21).
 """
 
 from __future__ import annotations
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional
 
 import datetime
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from trace.models.pdfa import PDFA

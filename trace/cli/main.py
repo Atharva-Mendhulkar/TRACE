@@ -4,6 +4,7 @@ Enhanced with violet-accent semantic CLI elements, interactive REPL shell, and s
 """
 
 from __future__ import annotations
+from typing import List, Optional
 
 import argparse
 import hashlib
@@ -13,7 +14,6 @@ import shlex
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional
 
 from trace.adapters.base import list_adapters
 from trace.cli.ui import (
@@ -30,19 +30,18 @@ from trace.cli.ui import (
     cli_h3,
     cli_kv,
     cli_progress_bar,
-    cli_rule,
     cli_table,
     status_pill,
     style,
 )
 from trace.corpus.store import TraceStore
-from trace.inference.flexfringe import FlexFringeRunner
-from trace.inference.native_learner import NativeStateMergingLearner
+from trace.inference.native_alergia import NativeStateMergingLearner
 from trace.ingestion.pipeline import IngestionPipeline
+from trace.models.pdfa import PDFA
 from trace.models.repository import ModelRepository
 from trace.policy.compiler import PolicyCompiler
 from trace.policy.dsl import PolicyParser
-from trace.verification.verifier import HierarchicalRuntimeVerifier, RuntimeVerifier
+from trace.verification.verifier import HierarchicalRuntimeVerifier
 
 DEFAULT_DB = "trace_data.sqlite"
 
@@ -81,11 +80,10 @@ def build_parser() -> argparse.ArgumentParser:
     train_p.add_argument("--role", "-r", help="Delegation role to train child model for (PRD §16.2)")
     train_p.add_argument(
         "--engine",
-        choices=["native", "native-alergia", "native-edsm", "native-rpni", "flexfringe"],
+        choices=["native", "native-alergia", "native-edsm"],
         default="native-alergia",
-        help="Inference engine (native-alergia, native-edsm, native-rpni, flexfringe)",
+        help="Inference engine (native-alergia, native-edsm)",
     )
-    train_p.add_argument("--heuristic", choices=["alergia", "edsm"], default="alergia", help="Merge heuristic")
     train_p.add_argument("--alpha", type=float, default=0.05, help="Hoeffding bound significance alpha")
     train_p.add_argument("--include-truncated", action="store_true", help="Include truncated traces in training")
     train_p.add_argument("--db", default=DEFAULT_DB, help="Database file path")
@@ -398,7 +396,6 @@ def cmd_demo(auto: bool = False, step_delay: float = 0.1, db_path: str = "mock_d
         "train",
         "--agent-id", "research-agent",
         "--engine", "native-alergia",
-        "--heuristic", "alergia",
         "--alpha", "0.05",
         "--db", db_path,
     ])
@@ -500,7 +497,7 @@ def cmd_demo(auto: bool = False, step_delay: float = 0.1, db_path: str = "mock_d
 
 
 def cmd_ingest(path_str: str, framework: Optional[str], db_path: str) -> int:
-    cli_h2(f"Ingesting Framework Events")
+    cli_h2("Ingesting Framework Events")
     cli_kv("Event Source", path_str)
     cli_kv("Framework Hint", framework or "auto-detect")
     cli_kv("Target DB", db_path)
@@ -552,7 +549,6 @@ def cmd_train(parsed: argparse.Namespace) -> int:
     cli_h2(f"Training Protocol Automata: {target_name}")
     cli_kv("Target ID", target_id)
     cli_kv("Inference Engine", parsed.engine)
-    cli_kv("Merge Heuristic", parsed.heuristic)
     cli_kv("Significance (α)", parsed.alpha)
     cli_kv("Training Traces", len(corpus))
 
@@ -564,16 +560,12 @@ def cmd_train(parsed: argparse.Namespace) -> int:
     kwargs = {}
     if "alergia" in parsed.engine or parsed.engine == "native":
         kwargs["alpha"] = parsed.alpha
-    elif parsed.engine == "flexfringe":
-        kwargs["heuristic"] = parsed.heuristic
-        kwargs["alpha"] = parsed.alpha
 
     engine = get_learner_engine(parsed.engine, **kwargs)
     pdfa = engine.fit(corpus)
 
     config = {
         "engine": getattr(engine, "name", parsed.engine),
-        "heuristic": parsed.heuristic,
         "alpha": parsed.alpha,
         "include_truncated": parsed.include_truncated,
         "role": parsed.role,
@@ -842,7 +834,7 @@ def cmd_feedback_record(violation_id: str, feedback_type: str, reviewer: str, co
         reviewer=reviewer,
         comment=comment,
     )
-    cli_alert_success(f"Feedback recorded successfully.")
+    cli_alert_success("Feedback recorded successfully.")
     cli_table(["Field", "Value"], [
         ["Feedback UUID", record.feedback_id],
         ["Violation UUID", record.violation_id],
@@ -990,7 +982,7 @@ def cmd_ingest_benchmark(path_str: str, dataset: str, db_path: str, train: bool)
             corpus = store.get_corpus(agent_id)
             if not corpus:
                 continue
-            learner = NativeStateMergingLearner(heuristic="alergia", alpha=0.05)
+            learner = NativeStateMergingLearner(alpha=0.05)
             pdfa = learner.fit(corpus)
             h = hashlib.sha256(json.dumps([t for t in corpus]).encode("utf-8")).hexdigest()[:16]
             model_id = repo.save_model(
@@ -1000,7 +992,7 @@ def cmd_ingest_benchmark(path_str: str, dataset: str, db_path: str, train: bool)
                 learner_config={"engine": "native-alergia", "alpha": 0.05, "source": "ingest-benchmark"},
             )
             repo.validate_model(model_id)
-            repo.promote_model(model_id, approver="benchmark-ingest")
+            repo.promote_model(model_id)
             cli_alert_success(f"Synthesized PDFA for '{agent_id}': Model UUID {model_id} ({len(pdfa.states)} states, {len(pdfa.alphabet)} symbols)")
 
     return 0 if (total_accepted > 0 or total_duplicates > 0) else 1

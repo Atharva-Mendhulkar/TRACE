@@ -3,11 +3,10 @@ Product Automaton & Multi-Track Conformance Classification (PRD §19).
 """
 
 from __future__ import annotations
+from dataclasses import dataclass
+from typing import List, Optional
 
 import math
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
-
 from trace.models.pdfa import PDFA
 from trace.policy.compiler import PolicyDFA
 
@@ -62,8 +61,6 @@ class ProductAutomaton:
         # State tracking
         self.q_learned: str = self.pdfa.q0
         self.q_policy: str = self.policy_dfa.q0
-        self.last_known_good_learned: str = self.pdfa.q0
-        self.last_known_good_policy: str = self.policy_dfa.q0
 
         # Parallel scalar likelihood tracking
         self.total_nll: float = 0.0
@@ -113,11 +110,6 @@ class ProductAutomaton:
         self.q_policy = next_q_p
         is_policy = not self.policy_dfa.is_accepted(next_q_p)
 
-        # Update last known-good states if this step was completely clean
-        if not is_structural and not is_statistical and not is_policy:
-            self.last_known_good_learned = self.q_learned
-            self.last_known_good_policy = self.q_policy
-
         return ClassificationResult(
             symbol=symbol,
             q_learned_before=q_l_before,
@@ -136,8 +128,6 @@ class ProductAutomaton:
         """Reset product automaton to initial states."""
         self.q_learned = self.pdfa.q0
         self.q_policy = self.policy_dfa.q0
-        self.last_known_good_learned = self.pdfa.q0
-        self.last_known_good_policy = self.policy_dfa.q0
         self.total_nll = 0.0
         self.valid_event_count = 0
         self.event_count = 0

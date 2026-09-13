@@ -4,7 +4,7 @@ Tests for Protocol Inference Engine & PDFA Formal Model (PRD §14, §15, §38).
 
 import pytest
 
-from trace.inference.native_learner import NativeStateMergingLearner
+from trace.inference.native_alergia import NativeStateMergingLearner
 from trace.inference.pta import PrefixTreeAcceptor
 from trace.models.pdfa import PDFA
 from trace.models.repository import ModelRepository
@@ -33,7 +33,7 @@ def test_native_learner_alergia_merge():
         ["plan_step", "web_search", "tool_result", "terminate"],
         ["plan_step", "file_read", "tool_result", "terminate"],
     ]
-    learner = NativeStateMergingLearner(heuristic="alergia", alpha=0.1)
+    learner = NativeStateMergingLearner(alpha=0.1)
     pdfa = learner.fit(traces)
 
     assert len(pdfa.states) >= 3

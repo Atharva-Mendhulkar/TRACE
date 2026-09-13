@@ -8,7 +8,7 @@ import pytest
 
 from trace.corpus.store import TraceStore
 from trace.explainability.explainer import DelegationContext
-from trace.inference.native_learner import NativeStateMergingLearner
+from trace.inference.native_alergia import NativeStateMergingLearner
 from trace.ingestion.pipeline import IngestionPipeline
 from trace.models.repository import ModelRepository
 from trace.policy.compiler import PolicyCompiler
@@ -135,7 +135,7 @@ def test_role_model_training_and_resolution(hierarchical_db):
 
     # Train parent PDFA
     parent_corpus = store.get_corpus("primary-agent")
-    parent_learner = NativeStateMergingLearner(heuristic="alergia", alpha=0.05)
+    parent_learner = NativeStateMergingLearner(alpha=0.05)
     parent_pdfa = parent_learner.fit(parent_corpus)
 
     parent_model_id = repo.save_model(
@@ -149,7 +149,7 @@ def test_role_model_training_and_resolution(hierarchical_db):
 
     # Train reviewer role PDFA
     reviewer_corpus = store.get_role_corpus("reviewer")
-    reviewer_learner = NativeStateMergingLearner(heuristic="alergia", alpha=0.05)
+    reviewer_learner = NativeStateMergingLearner(alpha=0.05)
     reviewer_pdfa = reviewer_learner.fit(reviewer_corpus)
 
     reviewer_model_id = repo.save_model(

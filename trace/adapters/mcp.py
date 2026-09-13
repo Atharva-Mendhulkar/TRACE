@@ -9,14 +9,7 @@ from typing import Any, Dict, List
 from uuid import uuid4
 
 from trace.adapters.base import FrameworkAdapter, RawTraceEvent, register_adapter
-from trace.schema.models import (
-    CESRecord,
-    EventAttributes,
-    ErrorInfo,
-    ProvenanceInfo,
-    ValidationResult,
-    compute_param_schema_hash,
-)
+from trace.schema.models import ValidationResult
 
 
 class MCPAdapter(FrameworkAdapter):
@@ -80,9 +73,7 @@ class MCPAdapter(FrameworkAdapter):
                 timestamp=timestamp,
                 framework="mcp",
                 framework_schema_version=schema_version,
-                sequence_no=seq_no,
-                metadata={"rpc_id": raw_event.get("id")},
-            )
+                sequence_no=seq_no            )
             events.append(call_event)
 
             # If combined with result
@@ -108,9 +99,7 @@ class MCPAdapter(FrameworkAdapter):
                     timestamp=timestamp,
                     framework="mcp",
                     framework_schema_version=schema_version,
-                    sequence_no=res_seq,
-                    metadata={"rpc_id": raw_event.get("id")},
-                )
+                    sequence_no=res_seq                )
                 events.append(result_event)
 
         # Handle tool result standalone
@@ -131,9 +120,7 @@ class MCPAdapter(FrameworkAdapter):
                     timestamp=timestamp,
                     framework="mcp",
                     framework_schema_version=schema_version,
-                    sequence_no=seq_no,
-                    metadata={"rpc_id": raw_event.get("id")},
-                )
+                    sequence_no=seq_no                )
             )
 
         # Handle errors
@@ -185,49 +172,6 @@ class MCPAdapter(FrameworkAdapter):
             )
 
         return events
-
-    def to_ces(self, raw_trace_event: RawTraceEvent) -> CESRecord:
-        param_hash = compute_param_schema_hash(raw_trace_event.param_schema)
-        # Phase 1: symbol is raw_symbol or canonical candidate
-        symbol = raw_trace_event.canonical_symbol_candidate or raw_trace_event.raw_symbol
-
-        error_obj = None
-        if raw_trace_event.error_class:
-            error_obj = ErrorInfo(
-                error_class=raw_trace_event.error_class,
-                retryable=raw_trace_event.retryable_error,
-            )
-
-        return CESRecord(
-            schema_version="1.0",
-            event_id=str(uuid4()),
-            trace_id=raw_trace_event.trace_id,
-            span_id=raw_trace_event.span_id,
-            parent_span_id=raw_trace_event.parent_span_id,
-            agent_id=raw_trace_event.agent_id,
-            role=raw_trace_event.role,
-            depth=raw_trace_event.depth,
-            event_type=raw_trace_event.event_type,  # type: ignore
-            symbol=symbol,
-            raw_symbol=raw_trace_event.raw_symbol,
-            attributes=EventAttributes(
-                param_schema_hash=param_hash,
-                status=raw_trace_event.status if raw_trace_event.status in ["success", "failure", "timeout"] else "unknown",  # type: ignore
-                latency_ms=raw_trace_event.latency_ms,
-                retry_count=raw_trace_event.retry_count,
-            ),
-            error=error_obj,
-            timestamp=raw_trace_event.timestamp,
-            framework="mcp",
-            framework_schema_version=raw_trace_event.framework_schema_version,
-            adapter_version=self.adapter_version,
-            sequence_no=raw_trace_event.sequence_no,
-            status=raw_trace_event.status if raw_trace_event.status in ["success", "failure", "timeout"] else "unknown",  # type: ignore
-            provenance=ProvenanceInfo(
-                timestamp_source="framework",
-                ingested_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            ),
-        )
 
 
 # Register singleton

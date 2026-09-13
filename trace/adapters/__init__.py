@@ -17,7 +17,6 @@ import trace.adapters.semantic_kernel
 import trace.adapters.google_adk
 import trace.adapters.autogen
 import trace.adapters.swebench
-import trace.adapters.osworld
 
 __all__ = [
     "FrameworkAdapter",

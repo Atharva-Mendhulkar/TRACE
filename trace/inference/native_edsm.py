@@ -7,12 +7,11 @@ from __future__ import annotations
 import copy
 from typing import Dict, List, Optional, Set, Tuple
 
-from trace.inference.base import LearnerEngine
 from trace.inference.pta import PrefixTreeAcceptor
 from trace.models.pdfa import PDFA
 
 
-class NativeEDSMEngine(LearnerEngine):
+class NativeEDSMEngine:
     """
     Reference/baseline passive automata learner implementing pure EDSM
     (Evidence-Driven State Merging) greedy merge search based on transition agreement.

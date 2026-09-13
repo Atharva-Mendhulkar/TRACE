@@ -5,7 +5,7 @@ Framework Adapter Base Definitions and Registry (PRD §11).
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from trace.schema.models import CESRecord, FrameworkType, ValidationResult
@@ -32,7 +32,6 @@ class RawTraceEvent(BaseModel):
     framework: FrameworkType
     framework_schema_version: str
     sequence_no: int = 0
-    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class FrameworkAdapter(ABC):
@@ -57,10 +56,56 @@ class FrameworkAdapter(ABC):
         """Parse one framework event into one or more RawTraceEvents."""
         pass
 
-    @abstractmethod
     def to_ces(self, raw_trace_event: RawTraceEvent) -> CESRecord:
-        """Map RawTraceEvent to Canonical Event Schema record with rule-based event_type."""
-        pass
+        """Map RawTraceEvent to Canonical Event Schema record."""
+        import datetime
+        from uuid import uuid4
+
+        from trace.schema.models import ErrorInfo, EventAttributes, ProvenanceInfo, compute_param_schema_hash
+
+        status = (
+            raw_trace_event.status
+            if raw_trace_event.status in ("success", "failure", "timeout")
+            else "unknown"
+        )
+        error = (
+            ErrorInfo(
+                error_class=raw_trace_event.error_class,
+                retryable=raw_trace_event.retryable_error,
+            )
+            if raw_trace_event.error_class
+            else None
+        )
+        return CESRecord(
+            schema_version="1.0",
+            event_id=str(uuid4()),
+            trace_id=raw_trace_event.trace_id,
+            span_id=raw_trace_event.span_id,
+            parent_span_id=raw_trace_event.parent_span_id,
+            agent_id=raw_trace_event.agent_id,
+            role=raw_trace_event.role,
+            depth=raw_trace_event.depth,
+            event_type=raw_trace_event.event_type,  # type: ignore[arg-type]
+            symbol=raw_trace_event.canonical_symbol_candidate or raw_trace_event.raw_symbol,
+            raw_symbol=raw_trace_event.raw_symbol,
+            attributes=EventAttributes(
+                param_schema_hash=compute_param_schema_hash(raw_trace_event.param_schema),
+                status=status,  # type: ignore[arg-type]
+                latency_ms=raw_trace_event.latency_ms,
+                retry_count=raw_trace_event.retry_count,
+            ),
+            error=error,
+            timestamp=raw_trace_event.timestamp,
+            framework=self.framework,
+            framework_schema_version=raw_trace_event.framework_schema_version,
+            adapter_version=self.adapter_version,
+            sequence_no=raw_trace_event.sequence_no,
+            status=status,  # type: ignore[arg-type]
+            provenance=ProvenanceInfo(
+                timestamp_source="framework",
+                ingested_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            ),
+        )
 
 
 _ADAPTER_REGISTRY: Dict[str, FrameworkAdapter] = {}

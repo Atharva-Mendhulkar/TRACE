@@ -4,9 +4,9 @@ Simulates agent behavior distributions for SWE-bench and autonomous workflow res
 """
 
 from __future__ import annotations
+from typing import List, Tuple
 
 import random
-from typing import Dict, List, Tuple
 from uuid import uuid4
 
 from trace.schema.models import CESRecord, EventAttributes, ProvenanceInfo

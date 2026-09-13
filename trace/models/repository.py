@@ -3,13 +3,12 @@ Model Repository & Lifecycle Management (PRD §14.7, §23).
 """
 
 from __future__ import annotations
+from typing import Any, Dict, List, Optional, Union
 
 import datetime
-import hashlib
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import uuid4
 
 from trace.models.pdfa import PDFA
@@ -24,16 +23,6 @@ class ModelLifecycleStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
     SUPERSEDED = "SUPERSEDED"
     ARCHIVED = "ARCHIVED"
-
-ModelStatus = Literal[
-    "TRAINING",
-    "VALIDATION",
-    "CANDIDATE",
-    "PROMOTED",
-    "ACTIVE",
-    "SUPERSEDED",
-    "ARCHIVED",
-]
 
 
 class ModelRepository:
@@ -91,7 +80,6 @@ class ModelRepository:
         training_corpus_hash: str,
         learner_config: Dict[str, Any],
         creator: str = "system",
-        taxonomy_version: int = 1,
         role: Optional[str] = None,
     ) -> str:
         """Store a newly trained PDFA in VALIDATION status."""
@@ -111,12 +99,12 @@ class ModelRepository:
 
             cur.execute("""
                 INSERT INTO models (
-                    model_id, model_version, agent_id, role, taxonomy_version,
+                    model_id, model_version, agent_id, role,
                     training_corpus_hash, learner_config, status,
                     creator, pdfa_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'VALIDATION', ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, 'VALIDATION', ?, ?, ?)
             """, (
-                model_id, model_version, agent_id, role, taxonomy_version,
+                model_id, model_version, agent_id, role,
                 training_corpus_hash, learner_json, creator, pdfa_json, now
             ))
             conn.commit()
@@ -195,7 +183,7 @@ class ModelRepository:
 
         return metrics
 
-    def promote_model(self, model_id: str, approver: str = "human_approver") -> bool:
+    def promote_model(self, model_id: str) -> bool:
         """
         Promote a CANDIDATE model to ACTIVE (PRD §23.3).
         Marks previous ACTIVE model as SUPERSEDED.
@@ -258,30 +246,6 @@ class ModelRepository:
                 SET status = 'ACTIVE', activated_at = ?
                 WHERE model_id = ?
             """, (now, model_id))
-            conn.commit()
-
-        return True
-
-    def rollback_model(self, agent_id: str, target_model_id: str, reason: str) -> bool:
-        """Rollback active model to a previous model version (PRD §23.4)."""
-        target = self.get_model(target_model_id)
-        if not target or target["agent_id"] != agent_id:
-            return False
-
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        with self._get_conn() as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                UPDATE models 
-                SET status = 'SUPERSEDED', superseded_at = ?
-                WHERE agent_id = ? AND status = 'ACTIVE'
-            """, (now, agent_id))
-
-            cur.execute("""
-                UPDATE models 
-                SET status = 'ACTIVE', activated_at = ?
-                WHERE model_id = ?
-            """, (now, target_model_id))
             conn.commit()
 
         return True

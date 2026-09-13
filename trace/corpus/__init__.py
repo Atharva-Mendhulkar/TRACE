@@ -2,7 +2,6 @@
 TRACE Corpus Management Package.
 """
 
-from trace.corpus.repository import TraceRepository
-from trace.corpus.store import TraceStore, SQLiteTraceRepository
+from trace.corpus.store import TraceStore
 
-__all__ = ["TraceRepository", "TraceStore", "SQLiteTraceRepository"]
+__all__ = ["TraceStore"]

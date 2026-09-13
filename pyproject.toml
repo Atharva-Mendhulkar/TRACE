@@ -13,24 +13,22 @@ authors = [
 ]
 dependencies = [
     "pydantic>=2.0",
-    "jsonschema>=4.18",
     "numpy>=1.24",
     "scipy>=1.10",
     "sqlalchemy>=2.0",
-    "redis>=5.0",
     "fastapi>=0.100",
-    "uvicorn>=0.20",
-    "httpx>=0.24"
+    "uvicorn>=0.20"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-asyncio",
+    "httpx>=0.24",  # required by fastapi.testclient in API tests
 ]
 
 [project.scripts]
 trace = "trace_entrypoint:main"
-trace-runtime = "trace_entrypoint:main"
 
 [tool.setuptools]
 py-modules = ["trace_entrypoint"]
