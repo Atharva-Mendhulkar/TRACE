@@ -184,7 +184,12 @@ def test_benchmark_suite_rq1_to_rq6():
     assert summary.rq4.policy_enforcement_accuracy == 1.0
     assert summary.rq5.drift_detected is True
     assert summary.rq6.reduction_percentage > 50.0
+    assert summary.semantic_ablation is not None
+    assert summary.semantic_ablation.compression_percentage > 50.0
+    assert summary.semantic_ablation.canonical_alphabet_size == 10
 
     rendered = summary.render_markdown()
     assert "RQ1: Learning Sample Complexity" in rendered
     assert "Budget Met (<5ms): **YES**" in rendered
+    assert "Semantic Abstraction Ablation" in rendered
+    assert "Vocabulary Compression" in rendered

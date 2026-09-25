@@ -39,7 +39,7 @@
     &middot;
     <a href="#cli-reference--interactive-shell"><strong>Interactive CLI & Demo »</strong></a>
     &middot;
-    <a href="#empirical-benchmark-findings-rq1rq6"><strong>Empirical Benchmarks (RQ1–RQ6) »</strong></a>
+    <a href="#empirical-benchmark-findings-rq1rq5"><strong>Empirical Benchmarks (RQ1–RQ5) »</strong></a>
     &middot;
     <a href="https://github.com/Atharva-Mendhulkar/TRACE/issues">Report an Issue</a>
   </p>
@@ -161,7 +161,7 @@ flowchart TD
 
 ### 6. Behavioral Concept Drift Detection (KS Test & Tail-Quantile CUSUM)
 - Continuously evaluates rolling conformance-score (NLL) distributions against training baselines.
-- Employs two-sample Kolmogorov-Smirnov (KS) hypothesis tests combined with 95th percentile tail-quantile CUSUM alerting to flag distribution shifts and trigger automated out-of-cycle relearning.
+- Employs two-sample Kolmogorov-Smirnov (KS) hypothesis tests combined with 95th percentile tail-quantile CUSUM alerting to flag distribution shifts and enter the model lifecycle/relearning path (subject to operator review where configured).
 
 ### 8. Human-in-the-Loop (HITL) Violation Triage & Candidate Lifecycle
 - Review triage workflow for runtime violations: **Approve (Valid Novelty)**, **Reject (Confirmed Threat)**, **Override Transition**.
@@ -247,15 +247,16 @@ Every component, schema contract, and architectural invariant is verified by aut
 ├──────────────────────────────┼────────────────────────────┼─────────────┼──────────────┤
 │ TOTAL AUTOMATED TESTS        │ Full Test Suite Coverage   │ 55 tests    │ 100% Passed  │
 ├──────────────────────────────┼────────────────────────────┼─────────────┼──────────────┤
-│ Empirical Evaluation (RQ1-6) │ Academic Benchmarks Matrix │ 6 Questions │ All Passed   │
-└──────────────────────────────┴────────────────────────────┴─────────────┴──────────────┘
+│ Empirical Evaluation (RQ1-5) │ Measured Benchmark Results │ 5 Questions │ All Passed   │
+│ RQ6: State Space Reduction   │ Analytical estimate only   │ 1 Question  │ See note ▼   │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Empirical Benchmark Findings (RQ1–RQ6)
+## Empirical Benchmark Findings (RQ1–RQ5)
 
-TRACE includes a rigorous benchmark evaluation harness (`trace benchmark run --rq all`) validating the 6 research questions outlined in the architecture specifications:
+TRACE includes a rigorous benchmark evaluation harness (`trace benchmark run --rq all`) with measured empirical results for **RQ1–RQ5**. All results are benchmark-specific measurements and should not be interpreted as universal guarantees across hardware, workloads, datasets, or deployment environments.
 
 | Research Question | Metric Evaluated | TRACE Measured Result | Target Specification | Status |
 |---|---|---|---|:---:|
@@ -264,6 +265,8 @@ TRACE includes a rigorous benchmark evaluation harness (`trace benchmark run --r
 | **RQ3: Verification Latency** | Single-event verification latency | **$\mathbf{p99 = 0.0206\text{ ms}}$** (p50: 0.015ms) | $\le 5.0\text{ ms}$ ($240\times$ faster) | **PASSED** |
 | **RQ4: Policy Enforcement** | Safety violation detection accuracy | **$100.0\%$ Accuracy** (0 false negatives) | $100\%$ detection | **PASSED** |
 | **RQ5: Drift Detection** | Two-sample KS test on shifted traces | **$\text{KS} = 0.9800$, Triggered** | Flag distribution shift | **PASSED** |
+
+> **Note — RQ6: Hierarchical State Space Reduction.** The benchmark harness includes an RQ6 module that computes an *analytical estimate* of the state-count difference between a flat product automaton and a bounded hierarchical representation (using fixed example sizes of $|Q_{\text{parent}}|=8$, $|Q_{\text{child}}|=6$). This is a mathematical illustration, not an empirical measurement from a real agent workload. No experimental RQ6 result is claimed.
 
 ---
 
@@ -399,7 +402,7 @@ FastAPI serves an interactive single-page application at **`http://localhost:800
 - **Real-Time SVG Graph Visualizer**: Renders learned states ($q_0, q_1, \dots$), probabilistic transitions, terminal markers, and animated state traversal.
 - **Streaming Verification Sandbox**: Interactive event injection console with preloaded anomaly payloads, instant dual-control verdict, and `<0.03ms` latency badge.
 - **HITL Feedback Triage Console**: Operator table for runtime violations with **Approve**, **Reject**, and **Override** one-click actions.
-- **Empirical Benchmarks Panel (RQ1–RQ6)**: Visual KPI cards displaying sample complexity, 0.9615 F1 recovery, and sub-millisecond latency.
+- **Empirical Benchmarks Panel (RQ1–RQ5)**: Visual KPI cards displaying sample complexity, 0.9615 F1 recovery, and sub-millisecond latency. RQ6 is shown as an analytical state-space estimate.
 - **Prometheus Metric Stream**: Live telemetry feed available at `/metrics`.
 
 To launch the server locally:
@@ -436,7 +439,7 @@ docker compose up --build -d
 - [x] **Phase 3: Production & Empirical Evaluation**
   - Real-world benchmark dataset adapters for SWE-bench and OSWorld with golden fixtures.
   - FastAPI REST API gateway, streaming queue consumers, and multi-container Docker Compose deployment.
-  - Automated empirical benchmark suite evaluating RQ1 through RQ6 with markdown reports.
+  - Automated benchmark harness with measured empirical results for RQ1–RQ5 and an analytical state-space estimate for RQ6.
   - Interactive Dark-Mode Web Dashboard console (`/dashboard`) and Prometheus telemetry stream (`/metrics`).
   - Posit/R-`cli`-inspired semantic terminal interface with Electric Violet accent theme, persistent REPL shell, and step-by-step interactive demonstration.
 

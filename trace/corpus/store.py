@@ -3,7 +3,7 @@ Durable Trace Store & Corpus Manager (PRD §13, §29).
 """
 
 from __future__ import annotations
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import sqlite3
 from pathlib import Path
@@ -64,6 +64,12 @@ class TraceStore:
                 ON events (parent_span_id);
             CREATE INDEX IF NOT EXISTS idx_events_symbol 
                 ON events (symbol, taxonomy_version);
+
+            CREATE TABLE IF NOT EXISTS quarantined_traces (
+                trace_id TEXT PRIMARY KEY,
+                reason TEXT NOT NULL,
+                quarantined_at TEXT NOT NULL
+            );
             """)
 
     def write_event(self, record: CESRecord) -> bool:
@@ -105,6 +111,48 @@ class TraceStore:
                 inserted += 1
         return inserted
 
+    def write_trace_safely(
+        self,
+        records: List[CESRecord],
+        baseline_pdfa: Optional[Any] = None,
+        max_mean_nll: float = 8.0,
+    ) -> Tuple[int, bool]:
+        """Insert trace records with outlier/poisoning protection (PRD §13, §29).
+        If baseline_pdfa is provided and the trace's mean NLL exceeds max_mean_nll (or is inf),
+        the trace is recorded in quarantined_traces and excluded from get_corpus().
+        Returns (records_inserted, is_quarantined).
+        """
+        if not records:
+            return 0, False
+
+        trace_id = records[0].trace_id
+        is_quarantine = False
+        if baseline_pdfa is not None:
+            symbols = [r.symbol for r in records if r.depth == 0]
+            if symbols:
+                mean_nll, _, _ = baseline_pdfa.compute_trace_mean_nll(symbols)
+                # ponytail: threshold on mean NLL; upgrade to isolation forest only if multi-dimensional density is required
+                if mean_nll == float("inf") or mean_nll > max_mean_nll:
+                    is_quarantine = True
+
+        inserted = self.write_events(records)
+        if is_quarantine:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO quarantined_traces (trace_id, reason, quarantined_at) VALUES (?, ?, ?)",
+                    (trace_id, "outlier_mean_nll", records[0].timestamp)
+                )
+                conn.commit()
+
+        return inserted, is_quarantine
+
+    def get_quarantined_traces(self) -> List[str]:
+        """Return list of trace_ids quarantined due to outlier/poisoning detection."""
+        with self._get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT trace_id FROM quarantined_traces")
+            return [row[0] for row in cur.fetchall()]
+
     def get_trace(self, trace_id: str, span_id: Optional[str] = None) -> List[CESRecord]:
         """Reconstruct ordered event sequence per (trace_id, span_id) using sequence_no (PRD §10.4)."""
         with self._get_conn() as conn:
@@ -132,13 +180,22 @@ class TraceStore:
             )
             return cur.fetchone() is not None
 
-    def get_all_trace_ids(self, agent_id: Optional[str] = None) -> List[str]:
+    def get_all_trace_ids(self, agent_id: Optional[str] = None, include_quarantined: bool = False) -> List[str]:
         with self._get_conn() as conn:
             cur = conn.cursor()
             if agent_id:
-                cur.execute("SELECT DISTINCT trace_id FROM events WHERE agent_id = ?", (agent_id,))
+                if include_quarantined:
+                    cur.execute("SELECT DISTINCT trace_id FROM events WHERE agent_id = ?", (agent_id,))
+                else:
+                    cur.execute(
+                        "SELECT DISTINCT trace_id FROM events WHERE agent_id = ? AND trace_id NOT IN (SELECT trace_id FROM quarantined_traces)",
+                        (agent_id,)
+                    )
             else:
-                cur.execute("SELECT DISTINCT trace_id FROM events")
+                if include_quarantined:
+                    cur.execute("SELECT DISTINCT trace_id FROM events")
+                else:
+                    cur.execute("SELECT DISTINCT trace_id FROM events WHERE trace_id NOT IN (SELECT trace_id FROM quarantined_traces)")
             return [row[0] for row in cur.fetchall()]
 
     def get_corpus(
@@ -147,7 +204,7 @@ class TraceStore:
         include_truncated: bool = False,
     ) -> List[List[str]]:
         """Return list of symbolic traces over alphabet Sigma (PRD §13.2, §13.4)."""
-        trace_ids = self.get_all_trace_ids(agent_id=agent_id)
+        trace_ids = self.get_all_trace_ids(agent_id=agent_id, include_quarantined=False)
         corpus: List[List[str]] = []
 
         for t_id in trace_ids:
@@ -171,7 +228,7 @@ class TraceStore:
         with self._get_conn() as conn:
             cur = conn.cursor()
             cur.execute(
-                "SELECT DISTINCT trace_id, span_id FROM events WHERE role = ? AND (depth > 0 OR parent_span_id IS NOT NULL)",
+                "SELECT DISTINCT trace_id, span_id FROM events WHERE role = ? AND (depth > 0 OR parent_span_id IS NOT NULL) AND trace_id NOT IN (SELECT trace_id FROM quarantined_traces)",
                 (role,)
             )
             spans = cur.fetchall()

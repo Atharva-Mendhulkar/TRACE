@@ -180,3 +180,47 @@ def test_hitl_feedback_engine_lifecycle():
     active = model_store.get_active_model("agent-hitl")
     assert active is not None
     assert active["pdfa"].states == {"q0", "q1"}
+
+
+def test_trace_store_outlier_quarantine():
+    store = TraceStore(":memory:")
+
+    # Baseline PDFA accepting: plan -> file_read -> terminate
+    baseline_pdfa = PDFA(q0="q0")
+    baseline_pdfa.add_transition("q0", "plan", "q1", frequency=10)
+    baseline_pdfa.add_transition("q1", "file_read", "q2", frequency=10)
+    baseline_pdfa.add_transition("q2", "terminate", "q_final", frequency=10)
+    baseline_pdfa.mark_final("q_final")
+    baseline_pdfa.recompute_all_probabilities()
+
+    # 1. Normal trace matches baseline
+    normal_tid = "trace-normal-001"
+    normal_events = [
+        _create_sample_event(normal_tid, "s1", "plan", 0, event_type="plan_step"),
+        _create_sample_event(normal_tid, "s1", "file_read", 1, event_type="tool_call"),
+        _create_sample_event(normal_tid, "s1", "terminate", 2, event_type="terminate"),
+    ]
+    inserted, is_quarantined = store.write_trace_safely(normal_events, baseline_pdfa=baseline_pdfa)
+    assert inserted == 3
+    assert not is_quarantined
+
+    # 2. Poisoned/anomalous trace violates baseline transitions
+    poison_tid = "trace-poison-002"
+    poison_events = [
+        _create_sample_event(poison_tid, "s2", "drop_db", 0, event_type="tool_call"),
+        _create_sample_event(poison_tid, "s2", "exfiltrate", 1, event_type="tool_call"),
+        _create_sample_event(poison_tid, "s2", "terminate", 2, event_type="terminate"),
+    ]
+    inserted_p, is_quarantined_p = store.write_trace_safely(poison_events, baseline_pdfa=baseline_pdfa)
+    assert inserted_p == 3
+    assert is_quarantined_p is True
+
+    # 3. Quarantined trace is listed in quarantine registry
+    quarantined = store.get_quarantined_traces()
+    assert poison_tid in quarantined
+    assert normal_tid not in quarantined
+
+    # 4. Quarantined trace is excluded from training corpus
+    corpus = store.get_corpus("agent-1")
+    assert len(corpus) == 1
+    assert corpus[0] == ["plan", "file_read", "terminate"]

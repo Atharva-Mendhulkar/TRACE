@@ -11,7 +11,7 @@ from trace.policy.compiler import PolicyCompiler
 from trace.policy.dsl import PolicyParser
 from trace.policy.product import ProductAutomaton
 from trace.schema.models import CESRecord, EventAttributes
-from trace.verification.verifier import RuntimeVerifier
+from trace.verification.verifier import PolicyViolationError, RuntimeVerifier, guard_action
 
 
 @pytest.fixture
@@ -137,3 +137,55 @@ def test_drift_detector():
     assert drift_event is not None
     assert drift_event.relearn_triggered
     assert drift_event.test_used == "ks_2samp+tail_quantile"
+
+
+def test_inline_guard_action(test_pdfa, test_policy_dfa):
+    trace_id = str(uuid4())
+    verifier = RuntimeVerifier(
+        pdfa=test_pdfa,
+        policy_dfa=test_policy_dfa,
+        mode="gate",
+        epsilon=0.10,
+    )
+
+    def make_event(symbol: str, seq: int) -> CESRecord:
+        return CESRecord(
+            schema_version="1.0",
+            event_id=str(uuid4()),
+            trace_id=trace_id,
+            span_id=trace_id,
+            agent_id="test-agent",
+            event_type="tool_call",
+            symbol=symbol,
+            raw_symbol=symbol,
+            attributes=EventAttributes(param_schema_hash="h"),
+            timestamp="2026-09-07T00:00:00Z",
+            framework="custom",
+            framework_schema_version="1.0",
+            adapter_version="1.0.0",
+            sequence_no=seq,
+            status="success",
+        )
+
+    call_count = {"allowed": 0, "blocked": 0}
+
+    @guard_action(verifier, lambda: make_event("plan_step", 0))
+    def run_plan():
+        call_count["allowed"] += 1
+        return "plan_done"
+
+    @guard_action(verifier, lambda: make_event("browse_rare", 1))
+    def run_blocked():
+        call_count["blocked"] += 1
+        return "should_not_run"
+
+    # Step 1: plan_step is allowed by policy DFA
+    assert run_plan() == "plan_done"
+    assert call_count["allowed"] == 1
+
+    # Step 2: browse_rare after plan_step violates 'FORBID SEQUENCE [ plan_step, browse_rare ]'
+    with pytest.raises(PolicyViolationError) as exc_info:
+        run_blocked()
+
+    assert "policy" in exc_info.value.response.classification
+    assert call_count["blocked"] == 0  # Function was never called!

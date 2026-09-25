@@ -25,6 +25,34 @@ class VerificationResponse:
     running_mean_nll: float = 0.0
 
 
+class PolicyViolationError(RuntimeError):
+    """Raised when an agent action is blocked by a policy or verifier in gate mode."""
+
+    def __init__(self, response: VerificationResponse):
+        super().__init__(
+            f"Action blocked by policy: event_id={response.event_id}, "
+            f"trace_id={response.trace_id}, classification={response.classification}"
+        )
+        self.response = response
+
+
+def guard_action(
+    verifier: Any,
+    event_builder: Callable[..., CESRecord],
+):
+    """Decorator to gate agent tool calls before execution."""
+
+    def decorator(fn: Callable):
+        def wrapper(*args, **kwargs):
+            event = event_builder(*args, **kwargs)
+            verifier.check_or_raise(event)
+            return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 class RuntimeVerifier:
     """Performs streaming and replay runtime verification against PDFA and Policy DFA."""
 
@@ -119,6 +147,13 @@ class RuntimeVerifier:
             results.append(self.verify_event(ev))
 
         return results
+
+    def check_or_raise(self, event: CESRecord) -> VerificationResponse:
+        """Verify event; in gate mode raises PolicyViolationError immediately if blocked."""
+        resp = self.verify_event(event)
+        if not resp.allowed:
+            raise PolicyViolationError(resp)
+        return resp
 
 
 class HierarchicalRuntimeVerifier:
@@ -356,3 +391,10 @@ class HierarchicalRuntimeVerifier:
             results.append(self.verify_event(ev))
 
         return results
+
+    def check_or_raise(self, event: CESRecord) -> VerificationResponse:
+        """Verify event; in gate mode raises PolicyViolationError immediately if blocked."""
+        resp = self.verify_event(event)
+        if not resp.allowed:
+            raise PolicyViolationError(resp)
+        return resp
